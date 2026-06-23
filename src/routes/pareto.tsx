@@ -35,13 +35,13 @@ function ParetoPage() {
               : "Presencia razonable en el Pareto; el foco debe ser optimizar precio y claim, no portafolio."
           }`}
         />
-        <div className="panel overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="panel overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-left">SKU</th>
                 <th className="px-3 py-2 text-left">Marca</th>
+                <th className="px-3 py-2 text-left">SKU</th>
                 <th className="px-3 py-2 text-left">Segmento</th>
                 <th className="px-3 py-2 text-right">Unidades</th>
                 <th className="px-3 py-2 text-right">Volumen (L)</th>
@@ -54,9 +54,12 @@ function ParetoPage() {
               {pareto.slice(0, 60).map((p, i) => (
                 <tr key={p.id} className={`border-t border-border ${p.esGoldery ? "bg-brand/10" : ""}`}>
                   <td className="px-3 py-2 tabular-nums text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-2">{p.descripcion}</td>
-                  <td className="px-3 py-2">{p.marca}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{p.segmento}</td>
+                  <td className="px-3 py-2 font-semibold text-foreground whitespace-nowrap">
+                    {p.marca || <span className="text-[color:var(--color-danger)]">(sin marca)</span>}
+                    {p.esGoldery && <Chip tone="good">propia</Chip>}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{p.descripcion || `${p.marca} ${fmtNum(p.tamanoMl)} ml`}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{p.segmento}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtNum(p.unidades)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtNum(p.volumenL, 1)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.shareVolumen, 2)}</td>
