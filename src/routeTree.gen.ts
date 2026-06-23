@@ -9,8 +9,80 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as ShareRouteImport } from './routes/share'
+import { Route as SegmentosRouteImport } from './routes/segmentos'
+import { Route as RecomendacionRouteImport } from './routes/recomendacion'
+import { Route as PreciosRouteImport } from './routes/precios'
+import { Route as ParetoRouteImport } from './routes/pareto'
+import { Route as MercaditoRouteImport } from './routes/mercadito'
+import { Route as ExportarRouteImport } from './routes/exportar'
+import { Route as EmpaqueRouteImport } from './routes/empaque'
+import { Route as ConfiguracionRouteImport } from './routes/configuracion'
+import { Route as ClaimsRouteImport } from './routes/claims'
+import { Route as BaseRouteImport } from './routes/base'
 import { Route as IndexRouteImport } from './routes/index'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShareRoute = ShareRouteImport.update({
+  id: '/share',
+  path: '/share',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SegmentosRoute = SegmentosRouteImport.update({
+  id: '/segmentos',
+  path: '/segmentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecomendacionRoute = RecomendacionRouteImport.update({
+  id: '/recomendacion',
+  path: '/recomendacion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreciosRoute = PreciosRouteImport.update({
+  id: '/precios',
+  path: '/precios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParetoRoute = ParetoRouteImport.update({
+  id: '/pareto',
+  path: '/pareto',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MercaditoRoute = MercaditoRouteImport.update({
+  id: '/mercadito',
+  path: '/mercadito',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExportarRoute = ExportarRouteImport.update({
+  id: '/exportar',
+  path: '/exportar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmpaqueRoute = EmpaqueRouteImport.update({
+  id: '/empaque',
+  path: '/empaque',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracionRoute = ConfiguracionRouteImport.update({
+  id: '/configuracion',
+  path: '/configuracion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaimsRoute = ClaimsRouteImport.update({
+  id: '/claims',
+  path: '/claims',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BaseRoute = BaseRouteImport.update({
+  id: '/base',
+  path: '/base',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +91,200 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/base': typeof BaseRoute
+  '/claims': typeof ClaimsRoute
+  '/configuracion': typeof ConfiguracionRoute
+  '/empaque': typeof EmpaqueRoute
+  '/exportar': typeof ExportarRoute
+  '/mercadito': typeof MercaditoRoute
+  '/pareto': typeof ParetoRoute
+  '/precios': typeof PreciosRoute
+  '/recomendacion': typeof RecomendacionRoute
+  '/segmentos': typeof SegmentosRoute
+  '/share': typeof ShareRoute
+  '/upload': typeof UploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/base': typeof BaseRoute
+  '/claims': typeof ClaimsRoute
+  '/configuracion': typeof ConfiguracionRoute
+  '/empaque': typeof EmpaqueRoute
+  '/exportar': typeof ExportarRoute
+  '/mercadito': typeof MercaditoRoute
+  '/pareto': typeof ParetoRoute
+  '/precios': typeof PreciosRoute
+  '/recomendacion': typeof RecomendacionRoute
+  '/segmentos': typeof SegmentosRoute
+  '/share': typeof ShareRoute
+  '/upload': typeof UploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/base': typeof BaseRoute
+  '/claims': typeof ClaimsRoute
+  '/configuracion': typeof ConfiguracionRoute
+  '/empaque': typeof EmpaqueRoute
+  '/exportar': typeof ExportarRoute
+  '/mercadito': typeof MercaditoRoute
+  '/pareto': typeof ParetoRoute
+  '/precios': typeof PreciosRoute
+  '/recomendacion': typeof RecomendacionRoute
+  '/segmentos': typeof SegmentosRoute
+  '/share': typeof ShareRoute
+  '/upload': typeof UploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/base'
+    | '/claims'
+    | '/configuracion'
+    | '/empaque'
+    | '/exportar'
+    | '/mercadito'
+    | '/pareto'
+    | '/precios'
+    | '/recomendacion'
+    | '/segmentos'
+    | '/share'
+    | '/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/base'
+    | '/claims'
+    | '/configuracion'
+    | '/empaque'
+    | '/exportar'
+    | '/mercadito'
+    | '/pareto'
+    | '/precios'
+    | '/recomendacion'
+    | '/segmentos'
+    | '/share'
+    | '/upload'
+  id:
+    | '__root__'
+    | '/'
+    | '/base'
+    | '/claims'
+    | '/configuracion'
+    | '/empaque'
+    | '/exportar'
+    | '/mercadito'
+    | '/pareto'
+    | '/precios'
+    | '/recomendacion'
+    | '/segmentos'
+    | '/share'
+    | '/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BaseRoute: typeof BaseRoute
+  ClaimsRoute: typeof ClaimsRoute
+  ConfiguracionRoute: typeof ConfiguracionRoute
+  EmpaqueRoute: typeof EmpaqueRoute
+  ExportarRoute: typeof ExportarRoute
+  MercaditoRoute: typeof MercaditoRoute
+  ParetoRoute: typeof ParetoRoute
+  PreciosRoute: typeof PreciosRoute
+  RecomendacionRoute: typeof RecomendacionRoute
+  SegmentosRoute: typeof SegmentosRoute
+  ShareRoute: typeof ShareRoute
+  UploadRoute: typeof UploadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/share': {
+      id: '/share'
+      path: '/share'
+      fullPath: '/share'
+      preLoaderRoute: typeof ShareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/segmentos': {
+      id: '/segmentos'
+      path: '/segmentos'
+      fullPath: '/segmentos'
+      preLoaderRoute: typeof SegmentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recomendacion': {
+      id: '/recomendacion'
+      path: '/recomendacion'
+      fullPath: '/recomendacion'
+      preLoaderRoute: typeof RecomendacionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/precios': {
+      id: '/precios'
+      path: '/precios'
+      fullPath: '/precios'
+      preLoaderRoute: typeof PreciosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pareto': {
+      id: '/pareto'
+      path: '/pareto'
+      fullPath: '/pareto'
+      preLoaderRoute: typeof ParetoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mercadito': {
+      id: '/mercadito'
+      path: '/mercadito'
+      fullPath: '/mercadito'
+      preLoaderRoute: typeof MercaditoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/exportar': {
+      id: '/exportar'
+      path: '/exportar'
+      fullPath: '/exportar'
+      preLoaderRoute: typeof ExportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/empaque': {
+      id: '/empaque'
+      path: '/empaque'
+      fullPath: '/empaque'
+      preLoaderRoute: typeof EmpaqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracion': {
+      id: '/configuracion'
+      path: '/configuracion'
+      fullPath: '/configuracion'
+      preLoaderRoute: typeof ConfiguracionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claims': {
+      id: '/claims'
+      path: '/claims'
+      fullPath: '/claims'
+      preLoaderRoute: typeof ClaimsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/base': {
+      id: '/base'
+      path: '/base'
+      fullPath: '/base'
+      preLoaderRoute: typeof BaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +297,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BaseRoute: BaseRoute,
+  ClaimsRoute: ClaimsRoute,
+  ConfiguracionRoute: ConfiguracionRoute,
+  EmpaqueRoute: EmpaqueRoute,
+  ExportarRoute: ExportarRoute,
+  MercaditoRoute: MercaditoRoute,
+  ParetoRoute: ParetoRoute,
+  PreciosRoute: PreciosRoute,
+  RecomendacionRoute: RecomendacionRoute,
+  SegmentosRoute: SegmentosRoute,
+  ShareRoute: ShareRoute,
+  UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
