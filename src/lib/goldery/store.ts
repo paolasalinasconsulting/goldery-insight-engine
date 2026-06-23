@@ -3,17 +3,6 @@ import type { CanonicalField, NormalizedSku, RawRow, Settings } from "./types";
 import { DEFAULT_SETTINGS, normalizeRows } from "./calc";
 import { buildMockRows, MOCK_COLUMN_MAP } from "./mock";
 
-export interface ClaimRow {
-  id: string;
-  claim: string;
-  marcasUsan: string;
-  loUsaLider: boolean;
-  loTieneGoldery: boolean;
-  goldery PuedeDecirlo?: boolean;
-  goldery_puede: boolean;
-  consumidor_entiende: boolean;
-}
-
 export interface PackChecklist {
   sku: string;
   items: boolean[];   // 10 items
