@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
 import { analyzeSegments, brandRanking, paretoSkus } from "@/lib/goldery/calc";
-import { PageHeader, KpiCard, InsightCard, Chip, fmtNum, fmtPct, fmtMoney } from "@/components/goldery/ui";
+import { PageHeader, KpiCard, InsightCard, Chip, SoWhat, fmtNum, fmtPct, fmtMoney } from "@/components/goldery/ui";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Target, TrendingUp, AlertTriangle } from "lucide-react";
@@ -10,8 +10,8 @@ import { ArrowRight, Target, TrendingUp, AlertTriangle } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Resumen ejecutivo · Goldery Analyzer" },
-      { name: "description", content: "Vista ejecutiva del diagnóstico de categoría: share, oportunidades y ruta estratégica recomendada." },
+      { title: "Overview · ShelfWise by Goldery" },
+      { name: "description", content: "Centro de comando ejecutivo: share, oportunidad, precio, brecha y ruta estratégica." },
     ],
   }),
   component: Dashboard,
@@ -28,6 +28,11 @@ function Dashboard() {
   const totalValor = data.reduce((s, r) => s + r.ventasValor, 0);
   const totalU = data.reduce((s, r) => s + r.unidades, 0);
   const goldery = brands.find((b) => b.esGoldery);
+  const lider = brands[0];
+  const gapShare = lider && goldery ? lider.shareVolumen - goldery.shareVolumen : 0;
+  const idxPrecio = goldery?.precioMlPromedio && lider?.precioMlPromedio
+    ? (goldery.precioMlPromedio / lider.precioMlPromedio) * 100
+    : 0;
   const segParticipa = segs.filter((s) => s.participaGoldery).length;
   const segNoParticipa = segs.length - segParticipa;
   const oport = segs[0];
@@ -37,25 +42,53 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title="Resumen ejecutivo"
-        subtitle={`Diagnóstico de ${categoria} · ${periodo}`}
+        title="ShelfWise"
+        subtitle={`Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad — ${categoria} · ${periodo}`}
       />
       <div className="p-8 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Volumen categoría" value={`${fmtNum(totalVol / 1000)} L`} sub={`${fmtNum((totalVol / 1_000_000) * settings.densidad, 1)} ton`} />
-          <KpiCard label="Ventas valor" value={fmtMoney(totalValor)} sub={`${fmtNum(totalU)} unidades`} />
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <KpiCard
             label={`Share volumen ${settings.marcaPropia}`}
             value={fmtPct(goldery?.shareVolumen ?? 0)}
-            sub={`Ranking #${goldery?.rank ?? "—"} de ${brands.length}`}
+            sub="Participación real calculada por toneladas"
             tone={(goldery?.shareVolumen ?? 0) > 0.1 ? "good" : (goldery?.shareVolumen ?? 0) > 0.05 ? "warn" : "bad"}
           />
           <KpiCard
-            label="Segmentos donde NO participa"
-            value={`${segNoParticipa} / ${segs.length}`}
-            sub={`${segParticipa} segmentos activos`}
-            tone={segNoParticipa > segParticipa ? "bad" : "warn"}
+            label="Ranking en categoría"
+            value={`#${goldery?.rank ?? "—"}`}
+            sub={`de ${brands.length} marcas activas`}
+            tone="info"
           />
+          <KpiCard
+            label="Mayor oportunidad"
+            value={oport?.segmento ?? "—"}
+            sub={oport ? `Score ${oport.scoreOportunidad}/100 · ${oport.nivelOportunidad}` : ""}
+            tone={oport?.nivelOportunidad === "Alta" ? "good" : "warn"}
+          />
+          <KpiCard
+            label="Índice precio vs líder"
+            value={fmtNum(idxPrecio, 0)}
+            sub="Base 100 = líder · <95 valor · >105 sobreprecio"
+            tone="info"
+          />
+          <KpiCard
+            label="Brecha vs líder"
+            value={fmtPct(gapShare)}
+            sub={`${lider?.marca ?? "—"} lidera con ${fmtPct(lider?.shareVolumen ?? 0)}`}
+            tone={gapShare > 0.15 ? "bad" : gapShare > 0.05 ? "warn" : "good"}
+          />
+          <KpiCard
+            label="Ruta estratégica"
+            value={oport ? rutaLabel(oport.recomendacion) : "—"}
+            sub={`${segNoParticipa}/${segs.length} segmentos sin participación`}
+            tone={oport?.recomendacion === "lanzar" ? "good" : oport?.recomendacion === "ajuste" ? "warn" : "neutral"}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <KpiCard label="Volumen categoría" value={`${fmtNum(totalVol / 1000)} L`} sub={`${fmtNum((totalVol / 1_000_000) * settings.densidad, 1)} ton totales`} />
+          <KpiCard label="Ventas valor" value={fmtMoney(totalValor)} sub="Suma anual del autoservicio analizado" />
+          <KpiCard label="Unidades vendidas" value={fmtNum(totalU)} sub="Base de cálculo de ranking y pareto" />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -63,7 +96,7 @@ function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <div className="text-sm font-semibold">Share de volumen por marca</div>
-                <div className="text-xs text-muted-foreground">Top 8 — barra destacada = marca propia</div>
+                <div className="text-xs text-muted-foreground">Top 8 — barra en cyan = marca propia</div>
               </div>
               <Link to="/share" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
                 Ver detalle <ArrowRight className="h-3 w-3" />
@@ -77,7 +110,7 @@ function Dashboard() {
                   <Tooltip cursor={{ fill: "var(--color-muted)" }} contentStyle={{ borderRadius: 8, border: "1px solid var(--color-border)", fontSize: 12 }} />
                   <Bar dataKey="share" radius={[4, 4, 0, 0]}>
                     {chartData.map((d, i) => (
-                      <Cell key={i} fill={d.esGoldery ? "var(--color-brand)" : "var(--color-chart-1)"} />
+                      <Cell key={i} fill={d.esGoldery ? "var(--color-cyan)" : "var(--color-brand)"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -86,7 +119,7 @@ function Dashboard() {
           </div>
 
           <div className="panel p-5">
-            <div className="text-sm font-semibold mb-3">Pareto de la categoría</div>
+            <div className="text-sm font-semibold mb-1">Pareto de la categoría</div>
             <div className="text-xs text-muted-foreground mb-3">
               {pareto.filter((p) => p.enPareto80).length} SKUs concentran el 80% del volumen
             </div>
@@ -100,6 +133,20 @@ function Dashboard() {
             </div>
           </div>
         </div>
+
+        <SoWhat>
+          {goldery && lider ? (
+            <>
+              <b>{settings.marcaPropia}</b> participa con <b>{fmtPct(goldery.shareVolumen)}</b> frente a <b>{lider.marca}</b> ({fmtPct(lider.shareVolumen)}),
+              con un índice de precio <b>{fmtNum(idxPrecio, 0)}</b>.{" "}
+              {idxPrecio < 95 && gapShare > 0.1
+                ? "El precio es competitivo pero el share es bajo: el problema probablemente no es precio sino empaque, claim o visibilidad en percha."
+                : idxPrecio > 110
+                ? "Existe un riesgo de sobreprecio que puede explicar la brecha contra el líder."
+                : "Existen segmentos sin participación que concentran volumen relevante. Priorizar el mapa de oportunidad."}
+            </>
+          ) : "Carga la data o usa los datos de prueba para activar el diagnóstico."}
+        </SoWhat>
 
         {oport && (
           <div className="grid lg:grid-cols-2 gap-6">
@@ -133,7 +180,7 @@ function Dashboard() {
 }
 
 function rutaLabel(r: "no-hacer" | "ajuste" | "lanzar") {
-  return r === "lanzar" ? "Nuevo lanzamiento / rediseño" : r === "ajuste" ? "Ajuste táctico" : "No hacer nada";
+  return r === "lanzar" ? "Nuevo lanzamiento" : r === "ajuste" ? "Ajuste táctico" : "No hacer nada";
 }
 function rutaDescripcion(r: "no-hacer" | "ajuste" | "lanzar") {
   return r === "lanzar"
