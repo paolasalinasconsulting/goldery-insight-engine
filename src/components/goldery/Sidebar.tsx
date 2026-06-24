@@ -20,7 +20,7 @@ const NAV = [
   { to: "/configuracion", label: "Configuración", icon: SettingsIcon },
 ] as const;
 
-function ShelfWiseMark() {
+function CategoryIQMark() {
   // Minimalist mark: gondola + ascending radar/growth line
   return (
     <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none">
@@ -38,9 +38,9 @@ export function Sidebar() {
     <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col">
       <div className="px-5 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <ShelfWiseMark />
+          <CategoryIQMark />
           <div className="leading-tight">
-            <div className="font-bold text-[15px] tracking-tight text-white">ShelfWise</div>
+            <div className="font-bold text-[15px] tracking-tight text-white">Category IQ</div>
             <div className="text-[10px] uppercase tracking-[0.08em] text-sidebar-foreground/55 mt-0.5">
               Category Intelligence
             </div>

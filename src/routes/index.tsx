@@ -10,7 +10,7 @@ import { ArrowRight, Target, TrendingUp, AlertTriangle } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Overview · ShelfWise by Goldery" },
+      { title: "Overview · Category IQ by Goldery" },
       { name: "description", content: "Centro de comando ejecutivo: share, oportunidad, precio, brecha y ruta estratégica." },
     ],
   }),
@@ -44,7 +44,7 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title="ShelfWise"
+        title="Category IQ"
         subtitle={`Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad — ${categoria} · ${periodo}`}
       />
       <div className="p-8 space-y-6">

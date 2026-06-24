@@ -53,10 +53,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ShelfWise · Category Intelligence Platform by Goldery" },
+      { title: "Category IQ · Category Intelligence Platform by Goldery" },
       { name: "description", content: "Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad." },
       { name: "author", content: "Goldery" },
-      { property: "og:title", content: "ShelfWise · Category Intelligence by Goldery" },
+      { property: "og:title", content: "Category IQ · Category Intelligence by Goldery" },
       { property: "og:description", content: "Centro de comando de categoría: dónde competir, con qué tamaño, precio, marca y claim." },
       { property: "og:type", content: "website" },
     ],
