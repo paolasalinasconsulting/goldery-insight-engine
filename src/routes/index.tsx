@@ -44,7 +44,7 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title="ShelfWise"
+        title="Category IQ"
         subtitle={`Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad — ${categoria} · ${periodo}`}
       />
       <div className="p-8 space-y-6">

@@ -20,7 +20,7 @@ const NAV = [
   { to: "/configuracion", label: "Configuración", icon: SettingsIcon },
 ] as const;
 
-function ShelfWiseMark() {
+function CategoryIQMark() {
   // Minimalist mark: gondola + ascending radar/growth line
   return (
     <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none">
