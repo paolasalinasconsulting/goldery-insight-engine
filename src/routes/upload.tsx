@@ -18,27 +18,51 @@ export const Route = createFileRoute("/upload")({
 });
 
 function UploadPage() {
+  const store = useGoldery();
   const {
-    categoria, periodo, cadena, pais, rawColumns, rawRows, mapping, fileName,
+    categoria, periodo, cadena, pais, rawColumns, rawRows, mapping, fileName, settings,
     setRaw, setMapping, recalc, loadMock, setCategoria, setContext,
-  } = useGoldery();
+  } = store;
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>("");
 
   const handleFile = async (file: File) => {
-    setStatus("Leyendo archivo…");
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    // Prefer "Base de Datos" sheet if present, else first
-    const sheetName = wb.SheetNames.find((s) => /base/i.test(s)) ?? wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-    const cols = Object.keys(json[0] ?? {});
-    setRaw(json, cols, `${file.name} · ${sheetName}`);
-    setStatus(`✓ ${json.length} filas leídas desde "${sheetName}"`);
+    try {
+      setStatus("Leyendo archivo…");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      // Prefer sheets that look like a database, else first non-empty
+      const sheetName =
+        wb.SheetNames.find((s) => /base|data|hoja1|sheet1/i.test(s)) ?? wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+      if (json.length === 0) {
+        setStatus(`⚠ La hoja "${sheetName}" está vacía. Hojas disponibles: ${wb.SheetNames.join(", ")}`);
+        return;
+      }
+      const cols = Object.keys(json[0] ?? {});
+      setRaw(json, cols, `${file.name} · ${sheetName}`);
+      setStatus(`✓ ${json.length} filas leídas desde "${sheetName}" (${cols.length} columnas)`);
+    } catch (e) {
+      setStatus(`✗ Error leyendo el archivo: ${(e as Error).message}`);
+    }
   };
 
-  const allMapped = ["marca", "descripcion", "tamano", "unidades"].every((k) => mapping[k as CanonicalField]);
+  const requiredKeys: CanonicalField[] = ["marca", "descripcion", "tamano", "unidades"];
+  const missing = requiredKeys.filter((k) => !mapping[k]);
+  const allMapped = missing.length === 0;
+
+  // Live preview: how many rows would survive normalization with current mapping
+  const preview = allMapped
+    ? normalizeRows(rawRows, mapping, settings, categoria)
+    : [];
+
+  const handleContinue = () => {
+    recalc();
+    navigate({ to: "/base" });
+  };
+
 
   return (
     <>
