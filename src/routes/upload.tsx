@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { useGoldery } from "@/lib/goldery/store";
 import { CANONICAL_FIELDS, type CanonicalField } from "@/lib/goldery/types";
+import { normalizeRows } from "@/lib/goldery/calc";
 import { PageHeader, Chip } from "@/components/goldery/ui";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, PlayCircle } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -18,27 +18,51 @@ export const Route = createFileRoute("/upload")({
 });
 
 function UploadPage() {
+  const store = useGoldery();
   const {
-    categoria, periodo, cadena, pais, rawColumns, rawRows, mapping, fileName,
+    categoria, periodo, cadena, pais, rawColumns, rawRows, mapping, fileName, settings,
     setRaw, setMapping, recalc, loadMock, setCategoria, setContext,
-  } = useGoldery();
+  } = store;
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>("");
 
   const handleFile = async (file: File) => {
-    setStatus("Leyendo archivo…");
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    // Prefer "Base de Datos" sheet if present, else first
-    const sheetName = wb.SheetNames.find((s) => /base/i.test(s)) ?? wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-    const cols = Object.keys(json[0] ?? {});
-    setRaw(json, cols, `${file.name} · ${sheetName}`);
-    setStatus(`✓ ${json.length} filas leídas desde "${sheetName}"`);
+    try {
+      setStatus("Leyendo archivo…");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      // Prefer sheets that look like a database, else first non-empty
+      const sheetName =
+        wb.SheetNames.find((s) => /base|data|hoja1|sheet1/i.test(s)) ?? wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+      if (json.length === 0) {
+        setStatus(`⚠ La hoja "${sheetName}" está vacía. Hojas disponibles: ${wb.SheetNames.join(", ")}`);
+        return;
+      }
+      const cols = Object.keys(json[0] ?? {});
+      setRaw(json, cols, `${file.name} · ${sheetName}`);
+      setStatus(`✓ ${json.length} filas leídas desde "${sheetName}" (${cols.length} columnas)`);
+    } catch (e) {
+      setStatus(`✗ Error leyendo el archivo: ${(e as Error).message}`);
+    }
   };
 
-  const allMapped = ["marca", "descripcion", "tamano", "unidades"].every((k) => mapping[k as CanonicalField]);
+  const requiredKeys: CanonicalField[] = ["marca", "descripcion", "tamano", "unidades"];
+  const missing = requiredKeys.filter((k) => !mapping[k]);
+  const allMapped = missing.length === 0;
+
+  // Live preview: how many rows would survive normalization with current mapping
+  const preview = allMapped
+    ? normalizeRows(rawRows, mapping, settings, categoria)
+    : [];
+
+  const handleContinue = () => {
+    recalc();
+    navigate({ to: "/base" });
+  };
+
 
   return (
     <>
@@ -119,20 +143,60 @@ function UploadPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-5 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs">
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center gap-2 text-xs flex-wrap">
                 {allMapped
                   ? <><CheckCircle2 className="h-4 w-4 text-[color:var(--color-success)]" /> <Chip tone="good">Campos requeridos OK</Chip></>
-                  : <><AlertCircle className="h-4 w-4 text-[color:var(--color-warning)]" /> <Chip tone="warn">Faltan campos requeridos</Chip></>}
-                <span className="text-muted-foreground">{rawRows.length} filas listas</span>
+                  : <><AlertCircle className="h-4 w-4 text-[color:var(--color-warning)]" /> <Chip tone="warn">Faltan: {missing.join(", ")}</Chip></>}
+                <span className="text-muted-foreground">{rawRows.length} filas leídas</span>
+                {allMapped && (
+                  <span className={preview.length === 0 ? "text-[color:var(--color-danger)] font-medium" : "text-muted-foreground"}>
+                    · {preview.length} filas válidas tras normalizar
+                  </span>
+                )}
               </div>
-              <Link
-                to="/base"
-                onClick={() => recalc()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-              >
-                Normalizar y continuar
-              </Link>
+              {allMapped && preview.length === 0 && (
+                <div className="text-xs text-[color:var(--color-danger)] bg-[color:var(--color-danger)]/5 border border-[color:var(--color-danger)]/20 rounded-md p-3">
+                  Ninguna fila sobrevive la normalización. Revisa que las columnas mapeadas a <b>Marca</b>, <b>Tamaño</b> y <b>Unidades vendidas</b> realmente contengan esos datos (no encabezados, subtotales o texto).
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button
+                  onClick={handleContinue}
+                  disabled={!allMapped}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Normalizar y continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Preview de columnas y primeras filas */}
+        {rawColumns.length > 0 && (
+          <div className="panel p-6">
+            <div className="text-sm font-semibold mb-1">3. Vista previa de la hoja</div>
+            <div className="text-xs text-muted-foreground mb-3">Primeras 5 filas tal como se leyeron del Excel.</div>
+            <div className="overflow-x-auto">
+              <table className="text-xs min-w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    {rawColumns.map((c) => (
+                      <th key={c} className="text-left px-2 py-1.5 font-semibold whitespace-nowrap">{c}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawRows.slice(0, 5).map((r, i) => (
+                    <tr key={i} className="border-b border-border/50">
+                      {rawColumns.map((c) => (
+                        <td key={c} className="px-2 py-1.5 whitespace-nowrap text-muted-foreground">{String(r[c] ?? "")}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
