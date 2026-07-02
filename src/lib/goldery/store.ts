@@ -116,20 +116,20 @@ export const useGoldery = create<GolderyState>((set, get) => ({
 }));
 
 function autoMap(cols: string[]): Partial<Record<CanonicalField, string>> {
-  const lc = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const lc = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const find = (...keys: string[]) => cols.find((c) => keys.some((k) => lc(c).includes(k)));
   return {
-    categoria: find("categ"),
-    marca: find("marca", "brand"),
-    descripcion: find("producto", "descrip", "sku"),
-    empaque: find("empaq", "pack", "presenta"),
-    tamano: find("tama", "ml", "size", "contenido"),
-    unidades: find("unidad", "cantidad", "qty", "vendid"),
-    pvp: find("pvp", "precio"),
-    ventasValor: find("ventas valor", "venta", "valor", "importe"),
-    periodo: find("period", "fecha", "mes"),
-    cadena: find("cadena", "local", "tienda"),
-    codigo: find("codigo", "code", "ean"),
+    categoria: find("categ", "segmento categoria"),
+    marca: find("marca", "brand", "fabricante"),
+    descripcion: find("descrip", "producto", "sku", "articulo", "item", "nombre"),
+    empaque: find("empaq", "pack", "presenta", "envase", "material"),
+    tamano: find("tama", "contenido", "gramaje", "capacidad", "size", "volumen unit", "ml", "litros", "gramos"),
+    unidades: find("unidades vendid", "unidades", "cantidad", "qty", "vendid", "pzas", "piezas", "volumen unid"),
+    pvp: find("pvp", "precio unit", "precio prom", "precio"),
+    ventasValor: find("ventas valor", "venta valor", "valor venta", "importe", "monto", "facturac", "ventas $", "ventas usd"),
+    periodo: find("period", "fecha", "mes", "año", "ano", "trimestre"),
+    cadena: find("cadena", "autoserv", "canal", "local", "tienda", "retailer"),
+    codigo: find("codigo", "cod ", "code", "ean", "sku ", "upc"),
   };
 }
 
