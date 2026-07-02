@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { useGoldery } from "@/lib/goldery/store";
 import { CANONICAL_FIELDS, type CanonicalField } from "@/lib/goldery/types";
+import { normalizeRows } from "@/lib/goldery/calc";
 import { PageHeader, Chip } from "@/components/goldery/ui";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, PlayCircle } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
