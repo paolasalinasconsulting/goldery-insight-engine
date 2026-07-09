@@ -99,9 +99,23 @@ function ClaimsPage() {
         title={`Matriz de claims — ${categoria}`}
         subtitle="No buscamos diferenciarnos primero: igualamos lo que el consumidor ya reconoce en los líderes de esta categoría."
         actions={
-          <button onClick={addClaim} className="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-medium">
-            + Añadir claim
-          </button>
+          <div className="flex items-center gap-2">
+            {claims.length > 0 && (
+              <button
+                onClick={() => {
+                  if (confirm(`¿Vaciar los ${claims.length} claim(s) de "${categoria}"? Esto permite empezar desde cero o importar una plantilla.`)) {
+                    setClaims([]);
+                  }
+                }}
+                className="text-xs px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-[color:var(--color-danger)] hover:border-[color:var(--color-danger)]"
+              >
+                Vaciar claims
+              </button>
+            )}
+            <button onClick={addClaim} className="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-medium">
+              + Añadir claim
+            </button>
+          </div>
         }
       />
       <div className="p-8 space-y-6">
