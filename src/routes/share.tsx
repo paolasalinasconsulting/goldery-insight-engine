@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, segmentBrandShare, varietyShare } from "@/lib/goldery/calc";
+import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, type FairShareRow } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, fmtNum, fmtPct } from "@/components/goldery/ui";
 import {
   Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
