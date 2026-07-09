@@ -105,6 +105,7 @@ function estadoBlanco(): CategoriaState {
     periodo: "2025-Q3", cadena: "Autoservicio Nacional", pais: "Ecuador",
     claims: DEFAULT_CLAIMS, packChecks: DEFAULT_PACK,
     liderManual: undefined, comparacionesPrecio: {},
+    priceHistory: [],
   };
 }
 
