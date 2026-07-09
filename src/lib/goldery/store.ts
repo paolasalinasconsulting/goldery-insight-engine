@@ -110,15 +110,30 @@ function estadoBlanco(seedClaims: ClaimRow[] = []): CategoriaState {
   };
 }
 
-/** Compara si dos arrays de claims son estructuralmente iguales (mismos textos y estados). */
-function sameClaims(a: ClaimRow[], b: ClaimRow[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((c, i) =>
-    c.claim === b[i].claim &&
-    c.marcasUsan === b[i].marcasUsan &&
-    c.loUsaLider === b[i].loUsaLider &&
-    c.loTieneGoldery === b[i].loTieneGoldery
-  );
+/** Heurística: los textos coinciden con la plantilla sembrada de Detergente líquido. */
+function looksLikeDetergentSeed(a: ClaimRow[] | undefined): boolean {
+  if (!a || a.length === 0) return false;
+  const defTexts = new Set(DEFAULT_CLAIMS.map((c) => c.claim));
+  const hits = a.filter((c) => defTexts.has(c.claim)).length;
+  // Si >=60% de los claims coinciden textualmente con la semilla de Detergente,
+  // asumimos que la categoría heredó el seed original y lo limpiamos.
+  return hits / a.length >= 0.6 && hits >= 3;
+}
+
+/** Limpia claims sembrados por error en categorías distintas de "Detergente líquido". */
+export function migrateClaimsPerCategoria(
+  guardadas: Record<string, CategoriaState>,
+): { guardadas: Record<string, CategoriaState>; changed: boolean } {
+  const next = { ...guardadas };
+  let changed = false;
+  for (const [cat, snap] of Object.entries(next)) {
+    if (cat === "Detergente líquido" || !snap) continue;
+    if (looksLikeDetergentSeed(snap.claims)) {
+      next[cat] = { ...snap, claims: [] };
+      changed = true;
+    }
+  }
+  return { guardadas: next, changed };
 }
 
 function proyectar(state: CategoriaState, settings: Settings, categoria: string) {
