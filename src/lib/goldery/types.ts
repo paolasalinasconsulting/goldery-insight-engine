@@ -4,6 +4,7 @@ export type CanonicalField =
   | "categoria"
   | "marca"
   | "descripcion"
+  | "variedad"
   | "empaque"
   | "tamano"
   | "unidad"
@@ -18,6 +19,7 @@ export const CANONICAL_FIELDS: { key: CanonicalField; label: string; required?: 
   { key: "categoria", label: "Categoría" },
   { key: "marca", label: "Marca", required: true },
   { key: "descripcion", label: "Descripción / SKU", required: true },
+  { key: "variedad", label: "Variedad / Aroma" },
   { key: "empaque", label: "Empaque" },
   { key: "tamano", label: "Tamaño / contenido", required: true },
   { key: "unidad", label: "Unidad de medida" },
@@ -34,13 +36,14 @@ export interface NormalizedSku {
   categoria: string;
   marca: string;
   descripcion: string;
+  variedad: string;
   empaque: string;
-  tamanoMl: number;        // normalized to ml (or g for solids treated as ml-equivalent)
+  tamanoMl: number;
   unidad: "ml" | "g" | "u";
   unidades: number;
-  pvp: number;             // unit price
+  pvp: number;
   ventasValor: number;
-  volumenMl: number;       // unidades * tamanoMl
+  volumenMl: number;
   volumenL: number;
   toneladas: number;
   precioPorMl: number;
@@ -50,15 +53,29 @@ export interface NormalizedSku {
 
 export interface SegmentRange {
   label: string;
-  min: number;    // ml inclusive
-  max: number;    // ml inclusive (Infinity for last bucket)
+  min: number;
+  max: number;
+}
+
+export type TriState = "si" | "no" | "duda";
+
+export interface ClaimRow {
+  id: string;
+  claim: string;
+  marcasUsan: string;
+  loUsaLider: boolean;
+  loTieneGoldery: TriState;
+  goldery_puede: TriState;      // aplica cuando loTieneGoldery = "no"
+  consumidor_entiende: TriState; // aplica cuando loTieneGoldery = "si"
 }
 
 export interface Settings {
   marcaPropia: string;
-  marcasPropias: string[];           // Goldery, Ana, Elixir, ...
-  densidad: number;                   // kg/L
+  marcasPropias: string[];
+  densidad: number;
   segmentos: SegmentRange[];
+  liderManual?: string; // override manual del líder de la categoría activa
+  comparacionesPrecio: Record<string, string>; // segmento -> marca contra la que se compara
   umbralOportunidad: { alta: number; media: number };
   umbralIndicePrecio: { muyBarato: number; valor: number; paridad: number; sobreprecio: number };
 }
