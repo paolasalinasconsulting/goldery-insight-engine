@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
 import { analyzeSegments, brandRanking, paretoSkus, categorySummary, normalizeRows } from "@/lib/goldery/calc";
 import { PageHeader, KpiCard, InsightCard, Chip, SoWhat, fmtNum, fmtPct, fmtMoney } from "@/components/goldery/ui";
