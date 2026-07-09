@@ -39,7 +39,7 @@ function BasePage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
-                  <Th>Marca</Th><Th>Producto</Th><Th>Empaque</Th><Th right>Tamaño (ml)</Th>
+                  <Th>Marca</Th><Th>Producto</Th><Th>Variedad</Th><Th>Empaque</Th><Th right>Tamaño (ml)</Th>
                   <Th>Segmento</Th><Th right>Unidades</Th><Th right>PVP</Th>
                   <Th right>Precio/ml</Th><Th right>Volumen (L)</Th><Th right>Ventas</Th>
                 </tr>
@@ -49,6 +49,7 @@ function BasePage() {
                   <tr key={r.id} className="border-t border-border hover:bg-muted/30">
                     <td className="px-3 py-2"><span className="flex items-center gap-2">{r.marca}{r.esGoldery && <Chip tone="good">propia</Chip>}</span></td>
                     <td className="px-3 py-2 text-muted-foreground">{r.descripcion}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.variedad}</td>
                     <td className="px-3 py-2 text-muted-foreground">{r.empaque}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtNum(r.tamanoMl)}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{r.segmento}</td>
