@@ -20,8 +20,31 @@ export const Route = createFileRoute("/exportar")({
 });
 
 function ExportPage() {
-  const { data, settings, claims, categoria, periodo, cadena } = useGoldery();
+  const { data, settings, claims, categoria, periodo, cadena, exportBackup, importBackup } = useGoldery();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const stem = `CategoryIQ_${categoria.replace(/\s+/g, "_")}_${periodo}`;
+
+  const doBackup = () => {
+    const json = exportBackup();
+    const blob = new Blob([json], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CategoryIQ_BACKUP_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus("✓ Backup descargado. Guárdalo antes de migrar a la nube.");
+  };
+
+  const doImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = importBackup(String(reader.result ?? ""));
+      setStatus(res.ok ? "✓ Backup restaurado correctamente." : `✗ Error al importar: ${res.error}`);
+    };
+    reader.readAsText(file);
+  };
 
   const dl = (rows: any[], sheet: string, filename: string) => {
     const wb = XLSX.utils.book_new();
