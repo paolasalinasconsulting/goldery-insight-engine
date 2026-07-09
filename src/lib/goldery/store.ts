@@ -99,14 +99,25 @@ const blankMerc = (n: string): MercaditoScenario => ({
   intencion: 32, preferencia: 28, calidad: 60, ahorro: 55, claridad: 50, comentarios: "",
 });
 
-function estadoBlanco(): CategoriaState {
+function estadoBlanco(seedClaims: ClaimRow[] = []): CategoriaState {
   return {
     rawRows: [], rawColumns: [], mapping: {}, fileName: "(sin datos)",
     periodo: "2025-Q3", cadena: "Autoservicio Nacional", pais: "Ecuador",
-    claims: DEFAULT_CLAIMS, packChecks: DEFAULT_PACK,
+    claims: seedClaims, packChecks: DEFAULT_PACK,
     liderManual: undefined, comparacionesPrecio: {},
     priceHistory: [],
   };
+}
+
+/** Compara si dos arrays de claims son estructuralmente iguales (mismos textos y estados). */
+function sameClaims(a: ClaimRow[], b: ClaimRow[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((c, i) =>
+    c.claim === b[i].claim &&
+    c.marcasUsan === b[i].marcasUsan &&
+    c.loUsaLider === b[i].loUsaLider &&
+    c.loTieneGoldery === b[i].loTieneGoldery
+  );
 }
 
 function proyectar(state: CategoriaState, settings: Settings, categoria: string) {
@@ -122,7 +133,7 @@ export const useGoldery = create<GolderyState>()(
     (set, get) => ({
       categoria: "Detergente líquido",
       categorias: ["Detergente líquido"],
-      categoriasGuardadas: { "Detergente líquido": estadoBlanco() },
+      categoriasGuardadas: { "Detergente líquido": estadoBlanco(DEFAULT_CLAIMS) },
       periodo: "2025-Q3",
       cadena: "Autoservicio Nacional",
       pais: "Ecuador",
@@ -317,7 +328,26 @@ export const useGoldery = create<GolderyState>()(
         mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state.recalc();
+        if (!state) return;
+        // Migración: limpiar claims sembrados por error (DEFAULT_CLAIMS) en categorías
+        // que no son "Detergente líquido" — cada categoría debe tener sus propios claims.
+        const guardadas = { ...state.categoriasGuardadas };
+        let changed = false;
+        for (const [cat, snap] of Object.entries(guardadas)) {
+          if (cat === "Detergente líquido") continue;
+          if (snap?.claims && sameClaims(snap.claims, DEFAULT_CLAIMS)) {
+            guardadas[cat] = { ...snap, claims: [] };
+            changed = true;
+          }
+        }
+        if (changed) {
+          state.categoriasGuardadas = guardadas;
+          const activa = guardadas[state.categoria];
+          if (activa && state.categoria !== "Detergente líquido" && sameClaims(state.claims ?? [], DEFAULT_CLAIMS)) {
+            state.claims = [];
+          }
+        }
+        state.recalc();
       },
     },
   ),
