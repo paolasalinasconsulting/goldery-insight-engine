@@ -134,6 +134,7 @@ export const useGoldery = create<GolderyState>()(
       data: [],
       claims: DEFAULT_CLAIMS,
       packChecks: DEFAULT_PACK,
+      priceHistory: [],
       mercaditoA: { ...blankMerc("Empaque actual"), intencion: 32 },
       mercaditoB: { ...blankMerc("Propuesta nueva"), intencion: 46, preferencia: 41, calidad: 72, claridad: 70 },
 
