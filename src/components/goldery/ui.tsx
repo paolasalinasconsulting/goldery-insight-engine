@@ -1,9 +1,19 @@
 import type { ReactNode } from "react";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, ChevronDown } from "lucide-react";
 import { useGoldery } from "@/lib/goldery/store";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
-  const { categoria, periodo, cadena, fileName, settings } = useGoldery();
+  const { categoria, categorias, cambiarCategoria, nuevaCategoria, periodo, cadena, fileName, settings } = useGoldery();
+
+  const handleCategoria = (val: string) => {
+    if (val === "__nueva__") {
+      const n = window.prompt("Nombre de la nueva categoría:");
+      if (n && n.trim()) nuevaCategoria(n.trim());
+      return;
+    }
+    cambiarCategoria(val);
+  };
+
   return (
     <div className="border-b border-border bg-card">
       <div className="px-8 pt-6 pb-5">
@@ -12,13 +22,28 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
             <h1 className="text-[26px] font-bold tracking-tight text-foreground">{title}</h1>
             {subtitle && <p className="text-sm text-muted-foreground mt-1 max-w-3xl">{subtitle}</p>}
           </div>
-          {actions && <div className="flex gap-2 shrink-0">{actions}</div>}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative">
+              <select
+                value={categoria}
+                onChange={(e) => handleCategoria(e.target.value)}
+                className="appearance-none bg-primary text-primary-foreground text-xs font-semibold pl-3 pr-8 py-2 rounded-md cursor-pointer"
+                title="Cambiar categoría activa"
+              >
+                {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__nueva__">+ Nueva categoría…</option>
+              </select>
+              <ChevronDown className="h-3.5 w-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-primary-foreground/80" />
+            </div>
+            {actions}
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px]">
           <ContextItem label="Categoría" value={categoria} />
           <ContextItem label="Periodo" value={periodo} />
           <ContextItem label="Cadena" value={cadena} />
           <ContextItem label="Marca propia" value={settings.marcaPropia} />
+          {settings.liderManual && <ContextItem label="Líder (manual)" value={settings.liderManual} />}
           <ContextItem label="Archivo" value={fileName} />
         </div>
       </div>
@@ -91,9 +116,7 @@ export function SoWhat({ children, title = "So What?" }: { children: ReactNode; 
           <Lightbulb className="h-4 w-4 text-white" />
         </div>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-bold text-[color:var(--color-brand)]">
-            {title}
-          </div>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-bold text-[color:var(--color-brand)]">{title}</div>
           <div className="text-sm text-foreground mt-1 leading-relaxed">{children}</div>
         </div>
       </div>

@@ -1,71 +1,100 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { analyzeSegments, priceDiagnosis } from "@/lib/goldery/calc";
-import { PageHeader, Chip, InsightCard, fmtMoney, fmtPct } from "@/components/goldery/ui";
+import { priceComparisonBySegment, priceMatrix } from "@/lib/goldery/calc";
+import { PageHeader, Chip, InsightCard, KpiCard, fmtPct } from "@/components/goldery/ui";
 
 export const Route = createFileRoute("/precios")({
   head: () => ({
     meta: [
-      { title: "Estrategia de precios · Goldery Analyzer" },
-      { name: "description", content: "Índice de precio por ml de la marca propia vs el líder por segmento." },
+      { title: "Estrategia de precios · Category IQ" },
+      { name: "description", content: "Índice de precio/ml de la marca propia vs la marca de referencia por segmento." },
     ],
   }),
   component: PreciosPage,
 });
 
 function PreciosPage() {
-  const { data, settings } = useGoldery();
-  const segs = useMemo(() => analyzeSegments(data, settings), [data, settings]);
-  const conPresencia = segs.filter((s) => s.participaGoldery);
+  const { data, settings, setComparacionPrecio } = useGoldery();
+  const matrix = useMemo(() => priceMatrix(data), [data]);
+  const comps = useMemo(() => priceComparisonBySegment(data, settings), [data, settings]);
 
-  const baratos = conPresencia.filter((s) => s.indicePrecio < 85).length;
-  const caros = conPresencia.filter((s) => s.indicePrecio > 115).length;
+  const marcasPorSegmento = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    for (const r of matrix) {
+      (m[r.segmento] ??= []).push(r.marca);
+    }
+    Object.values(m).forEach((arr) => arr.sort());
+    return m;
+  }, [matrix]);
+
+  const verdes = comps.filter((c) => c.semaforo === "verde").length;
+  const rojos = comps.filter((c) => c.semaforo === "rojo").length;
+  const sinPresencia = comps.filter((c) => c.semaforo === "gris").length;
 
   return (
     <>
-      <PageHeader title="Estrategia de precios" subtitle="Índice de precio/ml vs el líder del segmento." />
+      <PageHeader
+        title="Estrategia de precios"
+        subtitle={`Precio/ml = PVP ÷ Presentación. Índice = (Precio/ml ${settings.marcaPropia} ÷ Precio/ml referencia) × 100. Independiente del módulo de share.`}
+      />
       <div className="p-8 space-y-6">
-        <div className="grid lg:grid-cols-2 gap-4">
-          <InsightCard
-            tone={baratos > 0 ? "warn" : "good"}
-            title={`Segmentos donde Goldery está muy por debajo: ${baratos}`}
-            body="Diferenciales mayores al 15% pueden erosionar percepción de calidad si no comunican un beneficio claro de ahorro."
-          />
-          <InsightCard
-            tone={caros > 0 ? "bad" : "good"}
-            title={`Segmentos con sobreprecio alto: ${caros}`}
-            body="Sobreprecio mayor a 15% sin un claim de valor superior reduce conversión y rotación."
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <KpiCard label="Segmentos en verde (índice < 100)" value={verdes} sub={`${settings.marcaPropia} más barata o igual`} tone="good" />
+          <KpiCard label="Segmentos en rojo (índice ≥ 100)" value={rojos} sub={`${settings.marcaPropia} más cara`} tone={rojos > 0 ? "bad" : "good"} />
+          <KpiCard label="Sin presencia" value={sinPresencia} sub="Segmento sin SKU de la marca propia" tone={sinPresencia > 0 ? "warn" : "good"} />
         </div>
 
-        <div className="panel overflow-hidden">
-          <table className="w-full text-sm">
+        <InsightCard
+          tone="info"
+          title="Cómo leer el semáforo"
+          body="Verde = índice < 100 (mi marca es más barata que la referencia). Rojo = índice ≥ 100 (mi marca es más cara). El emparejamiento por defecto usa la marca de mayor volumen del segmento; puedes cambiar la referencia manualmente en la columna 'Comparar contra'."
+        />
+
+        <div className="panel overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left">Segmento</th>
-                <th className="px-3 py-2 text-left">Líder</th>
-                <th className="px-3 py-2 text-right">Precio/ml líder</th>
-                <th className="px-3 py-2 text-right">Precio/ml Goldery</th>
+                <th className="px-3 py-2 text-left">Comparar contra</th>
+                <th className="px-3 py-2 text-right">Precio/ml ref.</th>
+                <th className="px-3 py-2 text-right">Precio/ml {settings.marcaPropia}</th>
                 <th className="px-3 py-2 text-right">Índice</th>
-                <th className="px-3 py-2 text-left">Diagnóstico</th>
+                <th className="px-3 py-2 text-center">Semáforo</th>
+                <th className="px-3 py-2 text-right">Peso segmento</th>
               </tr>
             </thead>
             <tbody>
-              {segs.map((s) => {
-                const dx = priceDiagnosis(s.indicePrecio, settings.umbralIndicePrecio);
+              {comps.map((c) => {
+                const marcas = marcasPorSegmento[c.segmento] ?? [];
+                const totalVol = comps.reduce((s, x) => s + x.volumenSegmento, 0) || 1;
                 return (
-                  <tr key={s.segmento} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium">{s.segmento}</td>
-                    <td className="px-3 py-2">{s.lider}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">${s.precioMlLider.toFixed(4)}</td>
+                  <tr key={c.segmento} className="border-t border-border">
+                    <td className="px-3 py-2 font-medium">{c.segmento}</td>
+                    <td className="px-3 py-2">
+                      <select
+                        value={c.marcaComparada}
+                        onChange={(e) => setComparacionPrecio(c.segmento, e.target.value)}
+                        className="text-xs px-2 py-1 rounded-md border border-input bg-card"
+                      >
+                        {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">${c.precioMlComparado.toFixed(4)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
-                      {s.participaGoldery ? `$${s.precioMlGoldery.toFixed(4)}` : <Chip tone="bad">sin SKU</Chip>}
+                      {c.miMarcaPresente ? `$${c.precioMlMiMarca.toFixed(4)}` : <Chip tone="warn">sin PVP</Chip>}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">
-                      {s.indicePrecio > 0 ? s.indicePrecio.toFixed(0) : "—"}
+                    <td className="px-3 py-2 text-right tabular-nums font-bold">
+                      {c.indice > 0 ? c.indice.toFixed(0) : "—"}
                     </td>
-                    <td className="px-3 py-2"><Chip tone={dx.tone}>{dx.label}</Chip></td>
+                    <td className="px-3 py-2 text-center">
+                      {c.semaforo === "verde" && <span className="inline-block h-3 w-3 rounded-full bg-[color:var(--color-success)]" title="Verde: índice < 100" />}
+                      {c.semaforo === "rojo" && <span className="inline-block h-3 w-3 rounded-full bg-[color:var(--color-danger)]" title="Rojo: índice ≥ 100" />}
+                      {c.semaforo === "gris" && <span className="inline-block h-3 w-3 rounded-full bg-muted-foreground/40" title="Sin presencia de la marca propia" />}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {fmtPct(c.volumenSegmento / totalVol)}
+                    </td>
                   </tr>
                 );
               })}
@@ -73,27 +102,33 @@ function PreciosPage() {
           </table>
         </div>
 
-        <div className="space-y-2">
-          {conPresencia.map((s) => {
-            const dx = priceDiagnosis(s.indicePrecio, settings.umbralIndicePrecio);
-            return (
-              <div key={s.segmento} className="panel p-4 text-sm">
-                <span className="font-semibold">{s.segmento}: </span>
-                <span className="text-muted-foreground">
-                  {dx.level === "muy-barato"
-                    ? `Precio/ml ${(100 - s.indicePrecio).toFixed(0)}% por debajo de ${s.lider}. Revisar si el diferencial comunica ahorro o si erosiona calidad.`
-                    : dx.level === "valor"
-                    ? `Ventaja de valor (${(100 - s.indicePrecio).toFixed(0)}% bajo el líder). Si el share sigue bajo, el problema no es precio sino empaque/claim.`
-                    : dx.level === "paridad"
-                    ? `Paridad con ${s.lider}. La batalla se gana con claim y visibilidad en percha.`
-                    : dx.level === "moderado"
-                    ? `Sobreprecio moderado (${(s.indicePrecio - 100).toFixed(0)}%): debe estar justificado por un beneficio superior comunicado.`
-                    : `Sobreprecio alto (${(s.indicePrecio - 100).toFixed(0)}%): riesgo de baja conversión vs ${s.lider}. ${fmtMoney(0)}`}
-                  {" "}Goldery tiene {fmtPct(s.shareGolderyEnSegmento)} de share en este segmento.
-                </span>
-              </div>
-            );
-          })}
+        <div className="panel p-5">
+          <div className="text-sm font-semibold mb-3">Matriz completa precio/ml por marca × segmento</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/60 text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">Segmento</th>
+                  <th className="px-2 py-1.5 text-left">Marca</th>
+                  <th className="px-2 py-1.5 text-right">Precio/ml</th>
+                  <th className="px-2 py-1.5 text-right">Unidades</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix
+                  .slice()
+                  .sort((a, b) => a.segmento.localeCompare(b.segmento) || b.volumenMl - a.volumenMl)
+                  .map((r, i) => (
+                    <tr key={i} className={`border-t border-border ${r.esGoldery ? "bg-[color:var(--color-cyan)]/5" : ""}`}>
+                      <td className="px-2 py-1 text-muted-foreground">{r.segmento}</td>
+                      <td className="px-2 py-1 font-medium">{r.marca}{r.esGoldery && <span className="ml-1 text-[9px] text-[color:var(--color-cyan)]">◆</span>}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">${r.precioMlPromedio.toFixed(4)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{r.unidades.toLocaleString()}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </>
