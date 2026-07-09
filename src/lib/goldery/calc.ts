@@ -735,15 +735,38 @@ export function paretoBrandDiagnosis(
   return { golderyEn80, segmentosPareto80, segmentosGoldery, segmentosCompartidos, caso, mensaje };
 }
 
-export function unclassifiedSkusStats(data: NormalizedSku[]): {
+/** Rows con tamaño vacío/no legible — se descartan del análisis pero pueden ser volumen relevante. */
+export function unclassifiedStats(
+  rawRows: RawRow[],
+  mapping: Partial<Record<CanonicalField, string>>,
+  data: NormalizedSku[],
+): {
   skus: number;
-  volumenMl: number;
-  pctVolumen: number;
+  unidades: number;
   ejemplos: string[];
+  totalUnidades: number;
+  pctUnidades: number;
 } {
-  const total = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
-  const uncl = data.filter((r) => r.segmento === "Sin clasificar" || r.tamanoMl <= 0);
-  const vol = uncl.reduce((s, r) => s + r.volumenMl, 0);
-  const ejemplos = uncl.slice(0, 4).map((r) => `${r.marca}${r.descripcion ? " · " + r.descripcion : ""}`);
-  return { skus: uncl.length, volumenMl: vol, pctVolumen: vol / total, ejemplos };
+  const totalUnidades = data.reduce((s, r) => s + r.unidades, 0) || 1;
+  const tCol = mapping.tamano;
+  const mCol = mapping.marca;
+  const dCol = mapping.descripcion;
+  const uCol = mapping.unidades;
+  if (!tCol) return { skus: 0, unidades: 0, ejemplos: [], totalUnidades, pctUnidades: 0 };
+  const bad: { marca: string; desc: string; unidades: number }[] = [];
+  for (const r of rawRows) {
+    const t = String(r[tCol] ?? "").trim();
+    if (t && parseSize(t).ml > 0) continue;
+    const marca = String((mCol && r[mCol]) ?? "").trim();
+    if (!marca) continue;
+    const unidades = Number((uCol && r[uCol]) ?? 0) || 0;
+    if (unidades <= 0) continue;
+    bad.push({ marca, desc: String((dCol && r[dCol]) ?? "").trim(), unidades });
+  }
+  const unidades = bad.reduce((s, r) => s + r.unidades, 0);
+  const ejemplos = bad
+    .sort((a, b) => b.unidades - a.unidades)
+    .slice(0, 4)
+    .map((r) => `${r.marca}${r.desc ? " · " + r.desc : ""} (${r.unidades.toLocaleString()} u)`);
+  return { skus: bad.length, unidades, ejemplos, totalUnidades, pctUnidades: unidades / (totalUnidades + unidades) };
 }
