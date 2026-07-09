@@ -113,6 +113,34 @@ function ExportPage() {
     <>
       <PageHeader title="Exportar reporte" subtitle="Descarga el diagnóstico completo o por módulo (Excel/CSV)." />
       <div className="p-8 space-y-6 max-w-5xl">
+        {/* Backup completo — respaldo antes de migrar a Cloud */}
+        <div className="panel p-5 border-l-4 border-l-[color:var(--color-warning)]">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold flex items-center gap-2">
+                <Save className="h-4 w-4 text-[color:var(--color-warning)]" /> Backup completo (JSON)
+              </div>
+              <div className="text-xs text-muted-foreground mt-1 max-w-xl">
+                Descarga <b>todas las categorías</b>, settings, claims, comparativas de precio, empaque e histórico en un solo archivo.
+                Restaurable con "Importar". <b>Recomendado antes de migrar a Lovable Cloud.</b>
+              </div>
+              {status && <div className="text-xs mt-2 font-medium">{status}</div>}
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={doBackup} className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[color:var(--color-warning)] text-white text-sm font-medium hover:opacity-90">
+                <Save className="h-4 w-4" /> Descargar backup
+              </button>
+              <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted">
+                <Upload className="h-4 w-4" /> Importar
+              </button>
+              <input
+                ref={fileRef} type="file" accept="application/json,.json" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); e.target.value = ""; }}
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="panel p-5 flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold">Reporte ejecutivo completo</div>
@@ -122,6 +150,7 @@ function ExportPage() {
             <FileSpreadsheet className="h-4 w-4" /> Descargar completo (.xlsx)
           </button>
         </div>
+
 
         <div className="grid md:grid-cols-2 gap-4">
           {modulos.map((m) => (
