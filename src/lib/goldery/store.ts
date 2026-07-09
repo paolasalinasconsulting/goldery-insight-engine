@@ -34,6 +34,7 @@ interface CategoriaState {
   packChecks: PackChecklist[];
   liderManual?: string;
   comparacionesPrecio: Record<string, string>;
+  priceHistory: PriceSnapshot[];
 }
 
 interface GolderyState {
