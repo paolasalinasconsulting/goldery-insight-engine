@@ -65,12 +65,16 @@ function ExportPage() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "M1 Base");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(brandRanking(data)), "M2 Share marcas");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(varietyShare(data)), "M2 Share variedad");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fairShareBySegment(data)), "M2 FairShare Tamaño");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fairShareByVariedad(data)), "M2 FairShare Variedad");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(paretoSkus(data)), "M2 Pareto");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(priceComparisonBySegment(data, settings)), "M3 Precios");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(claims), "M4 Claims");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(claimFrequency(claims, data)), "M4 Frecuencia claims");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analyzeSegments(data, settings)), "Oportunidad");
     XLSX.writeFile(wb, `${stem}_completo.xlsx`);
   };
+
 
   const modulos = [
     {
