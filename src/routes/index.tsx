@@ -18,7 +18,21 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const { data, settings, categoria, periodo } = useGoldery();
+  const { data, settings, categoria, periodo, categorias, categoriasGuardadas, claims, cambiarCategoria } = useGoldery();
+
+  // ------- Feature 4: resumen por categoría -------
+  const categoryCards = useMemo(() => {
+    return categorias.map((cat) => {
+      if (cat === categoria) {
+        return { cat, summary: categorySummary(data, settings, claims), activa: true };
+      }
+      const st = categoriasGuardadas[cat];
+      if (!st) return { cat, summary: categorySummary([], settings, []), activa: false };
+      const localSettings: typeof settings = { ...settings, liderManual: st.liderManual, comparacionesPrecio: st.comparacionesPrecio };
+      const norm = normalizeRows(st.rawRows, st.mapping, localSettings, cat);
+      return { cat, summary: categorySummary(norm, localSettings, st.claims), activa: false };
+    });
+  }, [categorias, categoriasGuardadas, categoria, data, settings, claims]);
 
   const brands = useMemo(() => brandRanking(data), [data]);
   const segs = useMemo(() => analyzeSegments(data, settings), [data, settings]);
