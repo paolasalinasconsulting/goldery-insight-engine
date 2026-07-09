@@ -133,7 +133,7 @@ export const useGoldery = create<GolderyState>()(
     (set, get) => ({
       categoria: "Detergente líquido",
       categorias: ["Detergente líquido"],
-      categoriasGuardadas: { "Detergente líquido": estadoBlanco() },
+      categoriasGuardadas: { "Detergente líquido": estadoBlanco(DEFAULT_CLAIMS) },
       periodo: "2025-Q3",
       cadena: "Autoservicio Nacional",
       pais: "Ecuador",
