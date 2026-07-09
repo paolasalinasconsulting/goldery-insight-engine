@@ -62,6 +62,20 @@ function Dashboard() {
         subtitle={`Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad — ${categoria} · ${periodo}`}
       />
       <div className="p-8 space-y-6">
+        {/* Feature 4 · Dashboard integrado por categoría */}
+        <div className="panel p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <LayoutGrid className="h-4 w-4 text-[color:var(--color-brand)]" />
+            <div className="text-sm font-semibold">Vista consolidada por categoría</div>
+            <div className="text-xs text-muted-foreground">· Click en una tarjeta para activarla</div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {categoryCards.map(({ cat, summary, activa }) => (
+              <CategoryCard key={cat} cat={cat} summary={summary} activa={activa} onClick={() => cambiarCategoria(cat)} marcaPropia={settings.marcaPropia} />
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <KpiCard
             label={`Share volumen ${settings.marcaPropia}`}
