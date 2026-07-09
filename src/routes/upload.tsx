@@ -27,11 +27,23 @@ function UploadPage() {
   const {
     categoria, periodo, cadena, pais, rawColumns, rawRows, mapping, fileName, settings,
     setRaw, setMapping, recalc, loadMock, setContext, agregarFilaManual, eliminarFilaManual,
+    consolidarDuplicados,
   } = store;
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>("");
   const [tab, setTab] = useState<"archivo" | "manual">("archivo");
+  const [dupsIgnored, setDupsIgnored] = useState<Set<string>>(new Set());
+
+  const mappingIssues = useMemo(() => findDuplicateMappingTargets(mapping), [mapping]);
+  const variedadCheck = useMemo(
+    () => detectVariedadLooksLikeEmpaque(rawRows, mapping.variedad),
+    [rawRows, mapping.variedad],
+  );
+  const duplicates = useMemo(
+    () => detectDuplicateRows(rawRows, mapping).filter((g) => !dupsIgnored.has(g.key)),
+    [rawRows, mapping, dupsIgnored],
+  );
 
   // formulario manual
   const [form, setForm] = useState({ marca: "", producto: "", variedad: "", tamano: "", unidades: "", pvp: "" });
