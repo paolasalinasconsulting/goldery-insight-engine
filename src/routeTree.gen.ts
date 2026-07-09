@@ -21,6 +21,7 @@ import { Route as EmpaqueRouteImport } from './routes/empaque'
 import { Route as ConfiguracionRouteImport } from './routes/configuracion'
 import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as BaseRouteImport } from './routes/base'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 
 const UploadRoute = UploadRouteImport.update({
@@ -83,6 +84,11 @@ const BaseRoute = BaseRouteImport.update({
   path: '/base',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -91,6 +97,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/base': typeof BaseRoute
   '/claims': typeof ClaimsRoute
   '/configuracion': typeof ConfiguracionRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/base': typeof BaseRoute
   '/claims': typeof ClaimsRoute
   '/configuracion': typeof ConfiguracionRoute
@@ -122,6 +130,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/base': typeof BaseRoute
   '/claims': typeof ClaimsRoute
   '/configuracion': typeof ConfiguracionRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/base'
     | '/claims'
     | '/configuracion'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/base'
     | '/claims'
     | '/configuracion'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/base'
     | '/claims'
     | '/configuracion'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   BaseRoute: typeof BaseRoute
   ClaimsRoute: typeof ClaimsRoute
   ConfiguracionRoute: typeof ConfiguracionRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BaseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -297,6 +317,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   BaseRoute: BaseRoute,
   ClaimsRoute: ClaimsRoute,
   ConfiguracionRoute: ConfiguracionRoute,

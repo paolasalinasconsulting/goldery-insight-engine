@@ -4,12 +4,16 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { useAuth } from "@/hooks/useAuth";
+import { pullFromCloud, pushToCloud, startAutoSync, stopAutoSync } from "@/lib/goldery/sync";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "@/components/goldery/Sidebar";
 
@@ -86,12 +90,50 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 min-w-0 bg-background">
-          <Outlet />
-        </main>
-      </div>
+      <AuthGate />
     </QueryClientProvider>
+  );
+}
+
+function AuthGate() {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isAuthRoute = location.pathname === "/auth";
+
+  // Redirect unauthenticated users to /auth
+  useEffect(() => {
+    if (!loading && !user && !isAuthRoute) {
+      navigate({ to: "/auth" });
+    }
+  }, [loading, user, isAuthRoute, navigate]);
+
+  // Sync: pull on sign-in, push on sign-out
+  useEffect(() => {
+    if (!user) { stopAutoSync(); return; }
+    let cancelled = false;
+    (async () => {
+      const res = await pullFromCloud(user.id);
+      if (cancelled) return;
+      // Si la nube está vacía, subimos el snapshot local actual como primer estado
+      if (res === "empty") await pushToCloud(user.id);
+      startAutoSync(user.id);
+    })();
+    return () => { cancelled = true; stopAutoSync(); };
+  }, [user?.id]);
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Cargando…</div>;
+  }
+  if (isAuthRoute || !user) {
+    return <Outlet />;
+  }
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 min-w-0 bg-background">
+        <Outlet />
+      </main>
+    </div>
   );
 }
