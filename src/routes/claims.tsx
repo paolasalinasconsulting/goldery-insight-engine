@@ -48,7 +48,7 @@ function TriSelect({ value, onChange }: { value: TriState; onChange: (v: TriStat
 }
 
 function ClaimsPage() {
-  const { claims, setClaims, data } = useGoldery();
+  const { claims, setClaims, data, categoria } = useGoldery();
 
   const freq = useMemo(() => claimFrequency(claims, data), [claims, data]);
   const freqByClaim = useMemo(() => {
