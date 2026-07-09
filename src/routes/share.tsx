@@ -122,6 +122,23 @@ function SharePage() {
           </div>
         </div>
 
+        {/* Feature 1 · Fair Share */}
+        <div className="panel p-5 space-y-5">
+          <div>
+            <div className="text-sm font-semibold">Fair Share — ¿dónde estoy sobre o sub-indexado?</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Comparación de mi share total ({fmtPct(goldery?.shareVolumen ?? 0)}) contra mi share dentro de cada segmento y cada variedad.
+              Flecha verde = sobreindexado (gano más volumen del que me toca). Flecha roja = sub-indexado (pierdo volumen que me correspondería).
+            </div>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-5">
+            <FairShareTable titulo="Por agrupación de tamaño" rows={fairSeg} marcaPropia={settings.marcaPropia} />
+            <FairShareTable titulo="Por variedad / aroma" rows={fairVar} marcaPropia={settings.marcaPropia} />
+          </div>
+        </div>
+
+
+
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="panel p-5">
             <div className="text-sm font-semibold mb-1">Share por variedad / aroma</div>
