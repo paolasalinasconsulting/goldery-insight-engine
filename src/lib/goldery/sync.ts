@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { useGoldery } from "./store";
+import { useGoldery, migrateClaimsPerCategoria } from "./store";
 
 /** Extrae el snapshot persistible del store (mismo shape que `partialize`). */
 export function snapshot() {
@@ -16,10 +16,21 @@ export function snapshot() {
   };
 }
 
-/** Aplica un snapshot al store y recalcula la vista activa. */
+/** Aplica un snapshot al store y recalcula la vista activa.
+ *  Ejecuta la misma migración de claims por categoría que `onRehydrateStorage`,
+ *  para que un backup en la nube con claims sembrados por error se limpie al cargar. */
 export function applySnapshot(payload: any) {
   if (!payload || typeof payload !== "object") return;
-  useGoldery.setState(payload as any);
+  const guardadasIn = (payload.categoriasGuardadas ?? {}) as Record<string, any>;
+  const { guardadas, changed } = migrateClaimsPerCategoria(guardadasIn);
+  const activaCat = payload.categoria as string | undefined;
+  let activaClaims = payload.claims;
+  if (changed && activaCat && activaCat !== "Detergente líquido") {
+    // Si la categoría activa venía con el seed, reemplaza también la vista proyectada
+    const activaSnap = guardadas[activaCat];
+    if (activaSnap) activaClaims = activaSnap.claims;
+  }
+  useGoldery.setState({ ...payload, categoriasGuardadas: guardadas, claims: activaClaims } as any);
   useGoldery.getState().recalc();
 }
 
