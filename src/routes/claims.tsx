@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
 import type { ClaimRow, TriState } from "@/lib/goldery/types";
+import { claimFrequency } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, KpiCard } from "@/components/goldery/ui";
 
 export const Route = createFileRoute("/claims")({
