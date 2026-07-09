@@ -610,3 +610,140 @@ export function categorySummary(
     tieneData: data.length > 0,
   };
 }
+
+/* ============================================================
+ * Data-quality helpers: detección de mapeo dudoso y duplicados.
+ * ============================================================ */
+export const PACKAGING_KEYWORDS = [
+  "doypack","doy pack","botella","sachet","galon","galón","pouch","bolsa","frasco","caja","tarro","lata","spray","pote","stand up","standup",
+];
+
+export function detectVariedadLooksLikeEmpaque(
+  rows: RawRow[],
+  variedadCol: string | undefined,
+): { total: number; sospechosos: number; ejemplos: string[] } {
+  if (!variedadCol) return { total: 0, sospechosos: 0, ejemplos: [] };
+  const kw = PACKAGING_KEYWORDS;
+  let sospechosos = 0;
+  const set = new Set<string>();
+  for (const r of rows) {
+    const v = String(r[variedadCol] ?? "").toLowerCase().trim();
+    if (!v) continue;
+    if (kw.some((k) => v.includes(k))) {
+      sospechosos++;
+      if (set.size < 5) set.add(String(r[variedadCol]));
+    }
+  }
+  return { total: rows.length, sospechosos, ejemplos: [...set] };
+}
+
+export function findDuplicateMappingTargets(
+  mapping: Partial<Record<CanonicalField, string>>,
+): { col: string; targets: CanonicalField[] }[] {
+  const inv = new Map<string, CanonicalField[]>();
+  for (const [k, v] of Object.entries(mapping) as [CanonicalField, string | undefined][]) {
+    if (!v) continue;
+    const arr = inv.get(v) ?? [];
+    arr.push(k);
+    inv.set(v, arr);
+  }
+  return [...inv.entries()]
+    .filter(([, arr]) => arr.length > 1)
+    .map(([col, targets]) => ({ col, targets }));
+}
+
+export interface DuplicateGroup {
+  key: string;
+  marca: string;
+  variedad: string;
+  empaque: string;
+  tamano: string;
+  indices: number[];
+  unidadesTotal: number;
+}
+
+export function detectDuplicateRows(
+  rows: RawRow[],
+  mapping: Partial<Record<CanonicalField, string>>,
+): DuplicateGroup[] {
+  const get = (r: RawRow, k: CanonicalField) => (mapping[k] ? String(r[mapping[k]!] ?? "").trim().toLowerCase() : "");
+  const groups = new Map<string, DuplicateGroup>();
+  rows.forEach((r, i) => {
+    const marca = get(r, "marca");
+    const variedad = get(r, "variedad");
+    const empaque = get(r, "empaque");
+    const tamano = get(r, "tamano");
+    if (!marca || !tamano) return;
+    const key = [marca, variedad, empaque, tamano].join("|");
+    const cur = groups.get(key) ?? {
+      key,
+      marca: String(mapping.marca ? r[mapping.marca] : "") || marca.toUpperCase(),
+      variedad: String(mapping.variedad ? r[mapping.variedad] : "") || "",
+      empaque: String(mapping.empaque ? r[mapping.empaque] : "") || "",
+      tamano: String(mapping.tamano ? r[mapping.tamano] : "") || "",
+      indices: [],
+      unidadesTotal: 0,
+    };
+    cur.indices.push(i);
+    cur.unidadesTotal += Number(mapping.unidades ? r[mapping.unidades] : 0) || 0;
+    groups.set(key, cur);
+  });
+  return [...groups.values()].filter((g) => g.indices.length > 1);
+}
+
+/* ============================================================
+ * Pareto — análisis de brecha de portafolio vs. conversión.
+ * ============================================================ */
+export interface ParetoBrandDiagnosis {
+  golderyEn80: number;
+  segmentosPareto80: string[];
+  segmentosGoldery: string[];
+  segmentosCompartidos: string[];
+  caso: "sin-goldery" | "brecha-portafolio" | "brecha-conversion" | "ok";
+  mensaje: string;
+}
+
+export function paretoBrandDiagnosis(
+  pareto: (NormalizedSku & { enPareto80: boolean; shareVolumen: number })[],
+  data: NormalizedSku[],
+  marcaPropia: string,
+): ParetoBrandDiagnosis {
+  const en80 = pareto.filter((p) => p.enPareto80);
+  const golderyEn80 = en80.filter((p) => p.esGoldery).length;
+  const segmentosPareto80 = Array.from(new Set(en80.map((p) => p.segmento))).filter((s) => s && s !== "Sin clasificar");
+  const segmentosGoldery = Array.from(new Set(data.filter((r) => r.esGoldery).map((r) => r.segmento))).filter((s) => s && s !== "Sin clasificar");
+  const segmentosCompartidos = segmentosPareto80.filter((s) => segmentosGoldery.includes(s));
+
+  const golderyPresente = segmentosGoldery.length > 0;
+  let caso: ParetoBrandDiagnosis["caso"];
+  let mensaje: string;
+
+  if (!golderyPresente) {
+    caso = "sin-goldery";
+    mensaje = `${marcaPropia} no aparece en la data cargada de esta categoría — no se puede diagnosticar la presencia en el Pareto.`;
+  } else if (golderyEn80 >= 2) {
+    caso = "ok";
+    mensaje = `${marcaPropia} tiene ${golderyEn80} SKU(s) dentro del 80% del volumen; presencia razonable. El foco debe ser optimizar precio y claim, no portafolio.`;
+  } else if (segmentosCompartidos.length === 0) {
+    caso = "brecha-portafolio";
+    mensaje = `Brecha de portafolio: los SKUs que mueven el 80% viven en los tamaños ${segmentosPareto80.join(", ")}, pero ${marcaPropia} solo tiene presencia en ${segmentosGoldery.join(", ") || "otros tamaños"}. No estás compitiendo en los tamaños que la categoría realmente compra.`;
+  } else {
+    caso = "brecha-conversion";
+    mensaje = `Brecha de conversión: ${marcaPropia} sí tiene SKUs en los tamaños del Pareto (${segmentosCompartidos.join(", ")}), pero no capturan volumen suficiente para entrar al top 80%. El portafolio está en los tamaños correctos — revisar precio, visibilidad en percha, empaque y claim.`;
+  }
+
+  return { golderyEn80, segmentosPareto80, segmentosGoldery, segmentosCompartidos, caso, mensaje };
+}
+
+export function unclassifiedSkusStats(data: NormalizedSku[]): {
+  skus: number;
+  volumenMl: number;
+  pctVolumen: number;
+  ejemplos: string[];
+} {
+  const total = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const uncl = data.filter((r) => r.segmento === "Sin clasificar" || r.tamanoMl <= 0);
+  const vol = uncl.reduce((s, r) => s + r.volumenMl, 0);
+  const ejemplos = uncl.slice(0, 4).map((r) => `${r.marca}${r.descripcion ? " · " + r.descripcion : ""}`);
+  return { skus: uncl.length, volumenMl: vol, pctVolumen: vol / total, ejemplos };
+}
