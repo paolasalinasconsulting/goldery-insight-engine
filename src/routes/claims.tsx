@@ -96,8 +96,8 @@ function ClaimsPage() {
   return (
     <>
       <PageHeader
-        title="Matriz de claims (Me-Too)"
-        subtitle="No buscamos diferenciarnos primero: igualamos lo que el consumidor ya reconoce en los líderes."
+        title={`Matriz de claims — ${categoria}`}
+        subtitle="No buscamos diferenciarnos primero: igualamos lo que el consumidor ya reconoce en los líderes de esta categoría."
         actions={
           <button onClick={addClaim} className="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-medium">
             + Añadir claim
@@ -105,96 +105,177 @@ function ClaimsPage() {
         }
       />
       <div className="p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <KpiCard label="Claims que tengo" value={kpis.tengo} sub={`de ${claims.length} evaluados`} tone="good" />
-          <KpiCard label="Oportunidades Me-Too" value={kpis.meToo} sub="El líder los usa; yo puedo decirlos pero no los tengo" tone={kpis.meToo > 0 ? "bad" : "good"} />
-          <KpiCard label="Problemas de comprensión" value={kpis.noEntienden} sub="Los tengo pero el consumidor no los entiende" tone={kpis.noEntienden > 0 ? "warn" : "good"} />
-          <KpiCard label="Brechas vs categoría" value={kpis.brechasCat} sub="Apuestas de categoría que aún no tengo" tone={kpis.brechasCat > 0 ? "bad" : "good"} />
-        </div>
+        {claims.length === 0 ? (
+          <EmptyClaims categoria={categoria} onImport={(names) => setClaims(claimsFromNames(names))} onAdd={addClaim} />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <KpiCard label="Claims que tengo" value={kpis.tengo} sub={`de ${claims.length} evaluados en ${categoria}`} tone="good" />
+              <KpiCard label="Oportunidades Me-Too" value={kpis.meToo} sub="El líder los usa; yo puedo decirlos pero no los tengo" tone={kpis.meToo > 0 ? "bad" : "good"} />
+              <KpiCard label="Problemas de comprensión" value={kpis.noEntienden} sub="Los tengo pero el consumidor no los entiende" tone={kpis.noEntienden > 0 ? "warn" : "good"} />
+              <KpiCard label="Brechas vs categoría" value={kpis.brechasCat} sub="Apuestas de categoría que aún no tengo" tone={kpis.brechasCat > 0 ? "bad" : "good"} />
+            </div>
 
-        <InsightCard
-          tone={kpis.brechasCat > 0 ? "bad" : "good"}
-          title={kpis.brechasCat > 0 ? `${kpis.brechasCat} apuesta(s) de categoría sin cubrir` : "Sin brechas críticas frente a la categoría"}
-          body="Las 'apuestas de categoría' son claims comunicados por la mayoría de marcas del segmento — no tenerlos deja a Mi Marca fuera del código básico. Se ordenan primero en la tabla."
-        />
+            <InsightCard
+              tone={kpis.brechasCat > 0 ? "bad" : "good"}
+              title={kpis.brechasCat > 0 ? `${kpis.brechasCat} apuesta(s) de categoría sin cubrir` : "Sin brechas críticas frente a la categoría"}
+              body="Las 'apuestas de categoría' son claims comunicados por la mayoría de marcas del segmento — no tenerlos deja a Mi Marca fuera del código básico. Se ordenan primero en la tabla."
+            />
 
-        <div className="panel overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
-            <thead className="bg-muted/60 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-left">Claim</th>
-                <th className="px-3 py-2 text-center">Frecuencia</th>
-                <th className="px-3 py-2 text-left">Tipo</th>
-                <th className="px-3 py-2 text-left">Marcas que lo usan</th>
-                <th className="px-3 py-2 text-center">Líder</th>
-                <th className="px-3 py-2 text-center">¿Lo tengo?</th>
-                <th className="px-3 py-2 text-center">¿Puedo decirlo?</th>
-                <th className="px-3 py-2 text-center">¿Lo entienden?</th>
-                <th className="px-3 py-2 text-left">Prioridad</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderedIdx.map((i) => {
-                const c = claims[i];
-                const p = prioridad(c);
-                const f = freqByClaim.get(c.claim);
-                return (
-                  <tr key={c.id} className={`border-t border-border ${f?.brechaCritica ? "bg-[color:var(--color-danger)]/5" : ""}`}>
-                    <td className="px-3 py-2">
-                      <input value={c.claim} onChange={(e) => update(i, { claim: e.target.value })}
-                        className="w-full bg-transparent font-medium focus:outline-none focus:bg-muted/40 px-1 rounded" />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <div className="inline-flex items-center gap-1">
-                        <span className="text-sm font-bold tabular-nums">{f?.numMarcas ?? 0}</span>
-                        <span className="text-[10px] text-muted-foreground">marcas</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      {f?.tipo === "apuesta"
-                        ? <Chip tone={f.brechaCritica ? "bad" : "warn"}>{f.brechaCritica ? "⚠ Apuesta sin cubrir" : "Apuesta de categoría"}</Chip>
-                        : <Chip tone="neutral">Diferenciador</Chip>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input value={c.marcasUsan} onChange={(e) => update(i, { marcasUsan: e.target.value })}
-                        className="w-full bg-transparent text-xs text-muted-foreground focus:outline-none focus:bg-muted/40 px-1 rounded" />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <input type="checkbox" checked={c.loUsaLider} onChange={(e) => update(i, { loUsaLider: e.target.checked })} />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <TriSelect value={c.loTieneGoldery} onChange={(v) => update(i, { loTieneGoldery: v })} />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {c.loTieneGoldery === "no"
-                        ? <TriSelect value={c.goldery_puede} onChange={(v) => update(i, { goldery_puede: v })} />
-                        : <span className="text-[11px] text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {c.loTieneGoldery === "si"
-                        ? <TriSelect value={c.consumidor_entiende} onChange={(v) => update(i, { consumidor_entiende: v })} />
-                        : <span className="text-[11px] text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-3 py-2"><Chip tone={p.tone}>{p.label}</Chip></td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => remove(i)} className="text-xs text-muted-foreground hover:text-[color:var(--color-danger)]">×</button>
-                    </td>
+            <div className="panel overflow-x-auto">
+              <table className="w-full text-sm min-w-[1100px]">
+                <thead className="bg-muted/60 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Claim</th>
+                    <th className="px-3 py-2 text-center">Frecuencia</th>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-left">Marcas que lo usan</th>
+                    <th className="px-3 py-2 text-center">Líder</th>
+                    <th className="px-3 py-2 text-center">¿Lo tengo?</th>
+                    <th className="px-3 py-2 text-center">¿Puedo decirlo?</th>
+                    <th className="px-3 py-2 text-center">¿Lo entienden?</th>
+                    <th className="px-3 py-2 text-left">Prioridad</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {orderedIdx.map((i) => {
+                    const c = claims[i];
+                    const p = prioridad(c);
+                    const f = freqByClaim.get(c.claim);
+                    return (
+                      <tr key={c.id} className={`border-t border-border ${f?.brechaCritica ? "bg-[color:var(--color-danger)]/5" : ""}`}>
+                        <td className="px-3 py-2">
+                          <input value={c.claim} onChange={(e) => update(i, { claim: e.target.value })}
+                            className="w-full bg-transparent font-medium focus:outline-none focus:bg-muted/40 px-1 rounded" />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <span className="text-sm font-bold tabular-nums">{f?.numMarcas ?? 0}</span>
+                            <span className="text-[10px] text-muted-foreground">marcas</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          {f?.tipo === "apuesta"
+                            ? <Chip tone={f.brechaCritica ? "bad" : "warn"}>{f.brechaCritica ? "⚠ Apuesta sin cubrir" : "Apuesta de categoría"}</Chip>
+                            : <Chip tone="neutral">Diferenciador</Chip>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input value={c.marcasUsan} onChange={(e) => update(i, { marcasUsan: e.target.value })}
+                            className="w-full bg-transparent text-xs text-muted-foreground focus:outline-none focus:bg-muted/40 px-1 rounded" />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={c.loUsaLider} onChange={(e) => update(i, { loUsaLider: e.target.checked })} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <TriSelect value={c.loTieneGoldery} onChange={(v) => update(i, { loTieneGoldery: v })} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {c.loTieneGoldery === "no"
+                            ? <TriSelect value={c.goldery_puede} onChange={(v) => update(i, { goldery_puede: v })} />
+                            : <span className="text-[11px] text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {c.loTieneGoldery === "si"
+                            ? <TriSelect value={c.consumidor_entiende} onChange={(v) => update(i, { consumidor_entiende: v })} />
+                            : <span className="text-[11px] text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-2"><Chip tone={p.tone}>{p.label}</Chip></td>
+                        <td className="px-3 py-2 text-right">
+                          <button onClick={() => remove(i)} className="text-xs text-muted-foreground hover:text-[color:var(--color-danger)]">×</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-
-        <div className="text-xs text-muted-foreground">
-          Leyenda: <span className="chip-good px-2 py-0.5 rounded-full">Sí</span>{" "}
-          <span className="chip-bad px-2 py-0.5 rounded-full">No</span>{" "}
-          <span className="chip-warn px-2 py-0.5 rounded-full">Duda</span>
-          {" · "}"¿Puedo decirlo?" aplica solo cuando no tengo el claim. "¿Lo entienden?" aplica solo cuando sí lo tengo.
-        </div>
+            <div className="text-xs text-muted-foreground">
+              Leyenda: <span className="chip-good px-2 py-0.5 rounded-full">Sí</span>{" "}
+              <span className="chip-bad px-2 py-0.5 rounded-full">No</span>{" "}
+              <span className="chip-warn px-2 py-0.5 rounded-full">Duda</span>
+              {" · "}"¿Puedo decirlo?" aplica solo cuando no tengo el claim. "¿Lo entienden?" aplica solo cuando sí lo tengo.
+              {" · "}Los claims son independientes por categoría; los definitivos surgen de la investigación de mercado (fotos de percha y estudio de consumidor).
+            </div>
+          </>
+        )}
       </div>
     </>
+  );
+}
+
+function EmptyClaims({
+  categoria, onImport, onAdd,
+}: { categoria: string; onImport: (names: string[]) => void; onAdd: () => void }) {
+  const sugerida = templateForCategoria(categoria);
+  const [templateKey, setTemplateKey] = useState<string>(sugerida?.key ?? CLAIM_TEMPLATES[0].key);
+  const template = CLAIM_TEMPLATES.find((t) => t.key === templateKey) ?? CLAIM_TEMPLATES[0];
+  const [selected, setSelected] = useState<Set<string>>(new Set(template.claims));
+
+  // reset selección cuando cambia plantilla
+  useMemo(() => { setSelected(new Set(template.claims)); }, [templateKey]);
+
+  const toggle = (name: string) => {
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setSelected(next);
+  };
+
+  return (
+    <div className="panel p-8 space-y-6">
+      <div className="text-center space-y-2">
+        <div className="text-4xl">📋</div>
+        <h2 className="text-lg font-semibold">Aún no hay claims registrados en {categoria}</h2>
+        <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+          Cada categoría tiene sus propios claims. Empieza importando una plantilla de referencia
+          (podrás editarla libremente) o agrega claims uno a uno desde cero.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+        <div className="panel p-5 space-y-3">
+          <div className="text-sm font-semibold">Agregar manualmente</div>
+          <p className="text-xs text-muted-foreground">Creas cada claim con su propio texto, marcas que lo usan y evaluación.</p>
+          <button onClick={onAdd} className="text-xs px-3 py-2 rounded-md bg-primary text-primary-foreground font-medium">
+            + Añadir primer claim
+          </button>
+        </div>
+
+        <div className="panel p-5 space-y-3">
+          <div className="text-sm font-semibold">Empezar desde plantilla</div>
+          <p className="text-xs text-muted-foreground">
+            Marca los claims típicos que aplican a tu categoría, impórtalos y edítalos luego.
+          </p>
+          <label className="block text-[11px] text-muted-foreground">Plantilla</label>
+          <select
+            value={templateKey}
+            onChange={(e) => setTemplateKey(e.target.value)}
+            className="w-full text-xs px-2 py-1.5 rounded-md border border-border bg-background"
+          >
+            {CLAIM_TEMPLATES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}{sugerida?.key === t.key ? " (sugerida)" : ""}
+              </option>
+            ))}
+          </select>
+          <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-md p-2 bg-muted/30">
+            {template.claims.map((name) => (
+              <label key={name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/60 px-1 py-0.5 rounded">
+                <input type="checkbox" checked={selected.has(name)} onChange={() => toggle(name)} />
+                <span>{name}</span>
+              </label>
+            ))}
+          </div>
+          <button
+            disabled={selected.size === 0}
+            onClick={() => onImport(Array.from(selected))}
+            className="text-xs px-3 py-2 rounded-md bg-primary text-primary-foreground font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Importar {selected.size} claim{selected.size === 1 ? "" : "s"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
