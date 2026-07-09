@@ -215,3 +215,15 @@ function PreciosPage() {
     </>
   );
 }
+
+function SemaphoreDot({ color, n, label }: { color: string; n: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-lg font-bold tabular-nums">{n}</span>
+      </div>
+      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
