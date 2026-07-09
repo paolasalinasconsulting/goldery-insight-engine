@@ -1,8 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   LayoutDashboard, Upload, Database, ListOrdered, Layers,
-  DollarSign, MessageSquare, Package, FlaskConical, Target, FileDown, Settings as SettingsIcon, BarChart3,
+  DollarSign, MessageSquare, Package, FlaskConical, Target, FileDown, Settings as SettingsIcon, BarChart3, LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { pushToCloud, stopAutoSync } from "@/lib/goldery/sync";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -68,10 +71,40 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-5 py-3 border-t border-sidebar-border">
+      <UserFooter />
+    </aside>
+  );
+}
+
+function UserFooter() {
+  const { user } = useAuth();
+  async function signOut() {
+    if (user) { try { await pushToCloud(user.id); } catch {} }
+    stopAutoSync();
+    await supabase.auth.signOut();
+    window.location.href = "/auth";
+  }
+  return (
+    <div className="px-4 py-3 border-t border-sidebar-border space-y-2">
+      {user && (
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.1em] text-sidebar-foreground/45">Sesión</div>
+            <div className="text-[11px] text-white/85 truncate" title={user.email ?? ""}>{user.email}</div>
+          </div>
+          <button
+            onClick={signOut}
+            title="Cerrar sesión"
+            className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-white hover:bg-white/5"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <div>
         <div className="text-[10px] uppercase tracking-[0.1em] text-sidebar-foreground/45">Powered by</div>
         <div className="text-[12px] font-semibold text-white/85 mt-0.5">Goldery</div>
       </div>
-    </aside>
+    </div>
   );
 }
