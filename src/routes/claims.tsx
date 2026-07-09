@@ -104,43 +104,56 @@ function ClaimsPage() {
         }
       />
       <div className="p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <KpiCard label="Claims que tengo" value={kpis.tengo} sub={`de ${claims.length} evaluados`} tone="good" />
           <KpiCard label="Oportunidades Me-Too" value={kpis.meToo} sub="El líder los usa; yo puedo decirlos pero no los tengo" tone={kpis.meToo > 0 ? "bad" : "good"} />
           <KpiCard label="Problemas de comprensión" value={kpis.noEntienden} sub="Los tengo pero el consumidor no los entiende" tone={kpis.noEntienden > 0 ? "warn" : "good"} />
+          <KpiCard label="Brechas vs categoría" value={kpis.brechasCat} sub="Apuestas de categoría que aún no tengo" tone={kpis.brechasCat > 0 ? "bad" : "good"} />
         </div>
 
         <InsightCard
-          tone={kpis.meToo > 0 ? "bad" : "good"}
-          title={kpis.meToo > 0 ? `${kpis.meToo} claim(s) requieren activación Me-Too inmediata` : "Cobertura completa de claims básicos"}
-          body={kpis.meToo > 0
-            ? "Cada claim que el líder usa y tú puedes decir es una oportunidad táctica antes de cualquier rediseño de portafolio."
-            : "El foco de comunicación debe pasar a empaque y precio; los claims básicos ya están cubiertos."}
+          tone={kpis.brechasCat > 0 ? "bad" : "good"}
+          title={kpis.brechasCat > 0 ? `${kpis.brechasCat} apuesta(s) de categoría sin cubrir` : "Sin brechas críticas frente a la categoría"}
+          body="Las 'apuestas de categoría' son claims comunicados por la mayoría de marcas del segmento — no tenerlos deja a Mi Marca fuera del código básico. Se ordenan primero en la tabla."
         />
 
         <div className="panel overflow-x-auto">
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left">Claim</th>
+                <th className="px-3 py-2 text-center">Frecuencia</th>
+                <th className="px-3 py-2 text-left">Tipo</th>
                 <th className="px-3 py-2 text-left">Marcas que lo usan</th>
                 <th className="px-3 py-2 text-center">Líder</th>
                 <th className="px-3 py-2 text-center">¿Lo tengo?</th>
                 <th className="px-3 py-2 text-center">¿Puedo decirlo?</th>
                 <th className="px-3 py-2 text-center">¿Lo entienden?</th>
                 <th className="px-3 py-2 text-left">Prioridad</th>
-                <th className="px-3 py-2 text-left">Acción</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
-              {claims.map((c, i) => {
+              {orderedIdx.map((i) => {
+                const c = claims[i];
                 const p = prioridad(c);
+                const f = freqByClaim.get(c.claim);
                 return (
-                  <tr key={c.id} className="border-t border-border">
+                  <tr key={c.id} className={`border-t border-border ${f?.brechaCritica ? "bg-[color:var(--color-danger)]/5" : ""}`}>
                     <td className="px-3 py-2">
                       <input value={c.claim} onChange={(e) => update(i, { claim: e.target.value })}
                         className="w-full bg-transparent font-medium focus:outline-none focus:bg-muted/40 px-1 rounded" />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <div className="inline-flex items-center gap-1">
+                        <span className="text-sm font-bold tabular-nums">{f?.numMarcas ?? 0}</span>
+                        <span className="text-[10px] text-muted-foreground">marcas</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {f?.tipo === "apuesta"
+                        ? <Chip tone={f.brechaCritica ? "bad" : "warn"}>{f.brechaCritica ? "⚠ Apuesta sin cubrir" : "Apuesta de categoría"}</Chip>
+                        : <Chip tone="neutral">Diferenciador</Chip>}
                     </td>
                     <td className="px-3 py-2">
                       <input value={c.marcasUsan} onChange={(e) => update(i, { marcasUsan: e.target.value })}
@@ -163,7 +176,6 @@ function ClaimsPage() {
                         : <span className="text-[11px] text-muted-foreground">—</span>}
                     </td>
                     <td className="px-3 py-2"><Chip tone={p.tone}>{p.label}</Chip></td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{p.accion}</td>
                     <td className="px-3 py-2 text-right">
                       <button onClick={() => remove(i)} className="text-xs text-muted-foreground hover:text-[color:var(--color-danger)]">×</button>
                     </td>
@@ -173,6 +185,7 @@ function ClaimsPage() {
             </tbody>
           </table>
         </div>
+
 
         <div className="text-xs text-muted-foreground">
           Leyenda: <span className="chip-good px-2 py-0.5 rounded-full">Sí</span>{" "}
