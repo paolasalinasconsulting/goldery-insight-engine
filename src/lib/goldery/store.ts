@@ -328,7 +328,26 @@ export const useGoldery = create<GolderyState>()(
         mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state.recalc();
+        if (!state) return;
+        // Migración: limpiar claims sembrados por error (DEFAULT_CLAIMS) en categorías
+        // que no son "Detergente líquido" — cada categoría debe tener sus propios claims.
+        const guardadas = { ...state.categoriasGuardadas };
+        let changed = false;
+        for (const [cat, snap] of Object.entries(guardadas)) {
+          if (cat === "Detergente líquido") continue;
+          if (snap?.claims && sameClaims(snap.claims, DEFAULT_CLAIMS)) {
+            guardadas[cat] = { ...snap, claims: [] };
+            changed = true;
+          }
+        }
+        if (changed) {
+          state.categoriasGuardadas = guardadas;
+          const activa = guardadas[state.categoria];
+          if (activa && state.categoria !== "Detergente líquido" && sameClaims(state.claims ?? [], DEFAULT_CLAIMS)) {
+            state.claims = [];
+          }
+        }
+        state.recalc();
       },
     },
   ),
