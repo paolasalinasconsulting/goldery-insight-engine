@@ -230,6 +230,92 @@ function UploadPage() {
                 )}
                 {report && report.sinPVP > 0 && <Chip tone="warn">{report.sinPVP} sin PVP</Chip>}
               </div>
+
+              {mappingIssues.length > 0 && (
+                <div className="text-xs bg-[color:var(--color-danger)]/10 border border-[color:var(--color-danger)]/30 rounded-md p-3">
+                  <div className="font-semibold mb-1 text-[color:var(--color-danger)]">⚠ Una misma columna está mapeada a varios destinos</div>
+                  <ul className="space-y-0.5 text-muted-foreground">
+                    {mappingIssues.map((i) => (
+                      <li key={i.col}>
+                        · <b>«{i.col}»</b> se está usando como: {i.targets.join(", ")} — cada columna origen debe mapearse a un solo campo destino.
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {variedadCheck.sospechosos > 0 && (
+                <div className="text-xs bg-[color:var(--color-warning)]/10 border border-[color:var(--color-warning)]/30 rounded-md p-3">
+                  <div className="font-semibold mb-1">⚠ La columna mapeada a <b>Variedad</b> parece contener tipos de empaque</div>
+                  <div className="text-muted-foreground">
+                    {variedadCheck.sospechosos} de {variedadCheck.total} filas contienen palabras como {variedadCheck.ejemplos.map((e) => `"${e}"`).join(", ")}.
+                    <br />
+                    Variedad debería ser <b>aroma / tipo</b> (Limón, Floral, Manzanilla…). Revisa el mapeo: probablemente esa columna debe ir a <b>Empaque</b>.
+                  </div>
+                </div>
+              )}
+
+              {duplicates.length > 0 && (
+                <div className="text-xs bg-[color:var(--color-warning)]/10 border border-[color:var(--color-warning)]/30 rounded-md p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <Copy className="h-3.5 w-3.5" /> Se detectaron {duplicates.length} posibles SKUs duplicados
+                    </div>
+                    <button
+                      onClick={() => {
+                        const n = consolidarDuplicados(duplicates.map((d) => d.key));
+                        setStatus(`✓ ${n} grupo(s) consolidado(s)`);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[11px] font-medium"
+                    >
+                      <Merge className="h-3 w-3" /> Consolidar todos
+                    </button>
+                  </div>
+                  <div className="text-muted-foreground">
+                    Filas con la misma marca + variedad + empaque + tamaño. Decide si son el mismo SKU repetido (consolidar suma las unidades) o SKUs distintos (ignorar y diferenciarlos manualmente en la pestaña de entrada manual).
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border border-border rounded-md">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-muted/60 text-muted-foreground">
+                        <tr>
+                          <th className="px-2 py-1 text-left">Marca · Variedad · Empaque · Tamaño</th>
+                          <th className="px-2 py-1 text-right">Filas</th>
+                          <th className="px-2 py-1 text-right">Σ Unidades</th>
+                          <th className="px-2 py-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {duplicates.slice(0, 20).map((g) => (
+                          <tr key={g.key} className="border-t border-border">
+                            <td className="px-2 py-1 truncate max-w-[420px]">
+                              <b>{g.marca || "(sin marca)"}</b>
+                              {g.variedad && <> · {g.variedad}</>}
+                              {g.empaque && <> · {g.empaque}</>}
+                              {g.tamano && <> · {g.tamano}</>}
+                            </td>
+                            <td className="px-2 py-1 text-right tabular-nums">{g.indices.length}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">{g.unidadesTotal.toLocaleString()}</td>
+                            <td className="px-2 py-1 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => { consolidarDuplicados([g.key]); }}
+                                className="text-[color:var(--color-brand)] hover:underline mr-2"
+                              >consolidar</button>
+                              <button
+                                onClick={() => setDupsIgnored((s) => new Set(s).add(g.key))}
+                                className="text-muted-foreground hover:text-foreground"
+                              >son distintos</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {duplicates.length > 20 && (
+                      <div className="text-[10px] text-muted-foreground p-2">Mostrando primeros 20 grupos de {duplicates.length}.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {report && report.descartadas.length > 0 && (
                 <div className="text-xs bg-[color:var(--color-warning)]/10 border border-[color:var(--color-warning)]/30 rounded-md p-3">
                   <div className="font-semibold mb-1">Filas descartadas (validación amigable):</div>
