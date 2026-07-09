@@ -78,6 +78,7 @@ interface GolderyState {
   exportBackup: () => string;
   importBackup: (json: string) => { ok: boolean; error?: string };
   clearPriceHistory: () => void;
+  consolidarDuplicados: (keys: string[]) => number;
 }
 
 const DEFAULT_CLAIMS: ClaimRow[] = [
@@ -313,6 +314,46 @@ export const useGoldery = create<GolderyState>()(
         }
       },
       clearPriceHistory: () => set({ priceHistory: [] }),
+      consolidarDuplicados: (keys) => {
+        const s = get();
+        const mapping = s.mapping;
+        const getV = (r: RawRow, k: CanonicalField) =>
+          mapping[k] ? String(r[mapping[k]!] ?? "").trim().toLowerCase() : "";
+        const keyOf = (r: RawRow) =>
+          [getV(r, "marca"), getV(r, "variedad"), getV(r, "empaque"), getV(r, "tamano")].join("|");
+        const target = new Set(keys);
+        // group rows by key preserving first index
+        const groups = new Map<string, number[]>();
+        s.rawRows.forEach((r, i) => {
+          const k = keyOf(r);
+          const arr = groups.get(k) ?? [];
+          arr.push(i);
+          groups.set(k, arr);
+        });
+        let mergedGroups = 0;
+        const toRemove = new Set<number>();
+        const patched = [...s.rawRows];
+        const uCol = mapping.unidades;
+        const vCol = mapping.ventasValor;
+        for (const [k, idxs] of groups) {
+          if (!target.has(k) || idxs.length < 2) continue;
+          const [first, ...rest] = idxs;
+          let sumU = Number((uCol && patched[first][uCol]) ?? 0) || 0;
+          let sumV = Number((vCol && patched[first][vCol]) ?? 0) || 0;
+          for (const j of rest) {
+            sumU += Number((uCol && patched[j][uCol]) ?? 0) || 0;
+            sumV += Number((vCol && patched[j][vCol]) ?? 0) || 0;
+            toRemove.add(j);
+          }
+          if (uCol) patched[first] = { ...patched[first], [uCol]: sumU };
+          if (vCol) patched[first] = { ...patched[first], [vCol]: sumV };
+          mergedGroups++;
+        }
+        const nextRows = patched.filter((_, i) => !toRemove.has(i));
+        set({ rawRows: nextRows });
+        get().recalc();
+        return mergedGroups;
+      },
     }),
     {
       name: "categoryiq-store-v1",

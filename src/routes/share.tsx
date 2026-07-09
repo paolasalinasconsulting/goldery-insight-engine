@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, type FairShareRow } from "@/lib/goldery/calc";
+import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, unclassifiedStats, type FairShareRow } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, fmtNum, fmtPct } from "@/components/goldery/ui";
+import { AlertTriangle } from "lucide-react";
 import {
   Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
   PieChart, Pie, Legend,
@@ -22,8 +23,9 @@ const PALETTE = ["#1E3A8A", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6
 const MI_COLOR = "#06B6D4";
 
 function SharePage() {
-  const { data, settings } = useGoldery();
+  const { data, settings, rawRows, mapping } = useGoldery();
   const brands = useMemo(() => brandRanking(data), [data]);
+  const uncl = useMemo(() => unclassifiedStats(rawRows, mapping, data), [rawRows, mapping, data]);
   const goldery = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
   const stacks = useMemo(() => segmentBrandShare(data, settings), [data, settings]);
   const variedades = useMemo(() => varietyShare(data), [data]);
@@ -65,6 +67,22 @@ function SharePage() {
     <>
       <PageHeader title="Share de mercado" subtitle="Métrica principal: participación en VOLUMEN (unidades × presentación normalizada)." />
       <div className="p-8 space-y-6">
+        {uncl.skus > 0 && (
+          <div className="flex items-start gap-3 rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-4">
+            <AlertTriangle className="h-5 w-5 text-[color:var(--color-warning)] shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <div className="font-semibold">
+                {uncl.skus} SKUs ({(uncl.pctUnidades * 100).toFixed(1)}% de las unidades) sin tamaño asignado
+              </div>
+              <div className="text-muted-foreground text-xs mt-1">
+                Estos SKUs se excluyen de los segmentos y del cálculo de volumen — los shares por segmento pueden estar distorsionados. Ejemplos: {uncl.ejemplos.join(" · ")}.
+              </div>
+              <Link to="/upload" className="inline-block mt-2 text-xs text-[color:var(--color-brand)] hover:underline font-medium">
+                → Completar tamaño en la carga de datos
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="panel p-5 lg:col-span-2">
             <div className="text-sm font-semibold mb-1">Share de volumen por marca</div>

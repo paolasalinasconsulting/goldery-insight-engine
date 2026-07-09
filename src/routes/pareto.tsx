@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { paretoSkus } from "@/lib/goldery/calc";
+import { paretoSkus, paretoBrandDiagnosis, unclassifiedStats } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, fmtNum, fmtPct } from "@/components/goldery/ui";
+import { AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/pareto")({
   head: () => ({
@@ -15,26 +16,54 @@ export const Route = createFileRoute("/pareto")({
 });
 
 function ParetoPage() {
-  const { data, settings } = useGoldery();
+  const { data, settings, rawRows, mapping } = useGoldery();
   const pareto = useMemo(() => paretoSkus(data), [data]);
   const top80 = pareto.filter((p) => p.enPareto80);
-  const golderyEn80 = top80.filter((p) => p.esGoldery).length;
+  const uncl = useMemo(() => unclassifiedStats(rawRows, mapping, data), [rawRows, mapping, data]);
+  const diag = useMemo(() => paretoBrandDiagnosis(pareto, data, settings.marcaPropia), [pareto, data, settings.marcaPropia]);
+
+  const tone: "good" | "warn" | "bad" =
+    diag.caso === "ok" ? "good"
+      : diag.caso === "brecha-conversion" ? "warn"
+      : "bad";
+
+  const title =
+    diag.caso === "ok" ? "Presencia sólida en el Pareto"
+      : diag.caso === "brecha-portafolio" ? "Brecha de portafolio"
+      : diag.caso === "brecha-conversion" ? "Brecha de conversión"
+      : "Sin datos de la marca propia";
 
   return (
     <>
       <PageHeader title="Pareto de SKUs" subtitle={`${top80.length} SKUs concentran el 80% del volumen de la categoría.`} />
       <div className="p-8 space-y-6">
-        <InsightCard
-          tone={golderyEn80 >= 2 ? "good" : golderyEn80 >= 1 ? "warn" : "bad"}
-          title="Presencia de la marca propia en el Pareto"
-          body={`${settings.marcaPropia} aparece con ${golderyEn80} SKU(s) dentro del 80% que mueve la categoría. ${
-            golderyEn80 === 0
-              ? "Goldery está fuera de los SKUs que mueven el volumen — el portafolio actual no compite donde se compra."
-              : golderyEn80 < 2
-              ? "Presencia mínima en el Pareto: existe espacio para sumar uno o dos SKUs clave en los tamaños más vendidos."
-              : "Presencia razonable en el Pareto; el foco debe ser optimizar precio y claim, no portafolio."
-          }`}
-        />
+        {uncl.skus > 0 && (
+          <div className="flex items-start gap-3 rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-4">
+            <AlertTriangle className="h-5 w-5 text-[color:var(--color-warning)] shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <div className="font-semibold">
+                {uncl.skus} SKUs ({(uncl.pctUnidades * 100).toFixed(1)}% de las unidades) sin tamaño asignado
+              </div>
+              <div className="text-muted-foreground text-xs mt-1">
+                Estos SKUs no entran al ranking del Pareto porque no pueden convertirse a volumen. Ejemplos: {uncl.ejemplos.join(" · ")}.
+              </div>
+              <Link to="/upload" className="inline-block mt-2 text-xs text-[color:var(--color-brand)] hover:underline font-medium">
+                → Completar tamaño en la carga de datos
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <InsightCard tone={tone} title={title} body={diag.mensaje} />
+
+        {diag.caso !== "sin-goldery" && (
+          <div className="grid sm:grid-cols-3 gap-3 text-xs">
+            <MiniStat label="SKUs propios en el Pareto 80" value={String(diag.golderyEn80)} />
+            <MiniStat label="Segmentos del Pareto 80" value={diag.segmentosPareto80.join(", ") || "—"} />
+            <MiniStat label={`Segmentos donde ${settings.marcaPropia} participa`} value={diag.segmentosGoldery.join(", ") || "—"} />
+          </div>
+        )}
+
         <div className="panel overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
@@ -72,5 +101,14 @@ function ParetoPage() {
         </div>
       </div>
     </>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="panel p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-foreground truncate">{value}</div>
+    </div>
   );
 }
