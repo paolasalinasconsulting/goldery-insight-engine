@@ -53,6 +53,7 @@ interface GolderyState {
   data: NormalizedSku[];
   claims: ClaimRow[];
   packChecks: PackChecklist[];
+  priceHistory: PriceSnapshot[];
   mercaditoA: MercaditoScenario;
   mercaditoB: MercaditoScenario;
 
