@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
 import { priceComparisonBySegment, priceMatrix } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, KpiCard, fmtPct } from "@/components/goldery/ui";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 
 export const Route = createFileRoute("/precios")({
   head: () => ({
