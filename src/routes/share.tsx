@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, segmentBrandShare, varietyShare } from "@/lib/goldery/calc";
+import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, type FairShareRow } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, fmtNum, fmtPct } from "@/components/goldery/ui";
 import {
   Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -27,6 +27,8 @@ function SharePage() {
   const goldery = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
   const stacks = useMemo(() => segmentBrandShare(data, settings), [data, settings]);
   const variedades = useMemo(() => varietyShare(data), [data]);
+  const fairSeg = useMemo(() => fairShareBySegment(data), [data]);
+  const fairVar = useMemo(() => fairShareByVariedad(data), [data]);
 
   const chart = brands.map((b) => ({ marca: b.marca, share: +(b.shareVolumen * 100).toFixed(1), esGoldery: b.esGoldery }));
   const donut = brands.map((b, i) => ({ name: b.marca, value: b.volumenMl, esGoldery: b.esGoldery, color: b.esGoldery ? MI_COLOR : PALETTE[(i + 1) % PALETTE.length] }));
@@ -120,6 +122,23 @@ function SharePage() {
           </div>
         </div>
 
+        {/* Feature 1 · Fair Share */}
+        <div className="panel p-5 space-y-5">
+          <div>
+            <div className="text-sm font-semibold">Fair Share — ¿dónde estoy sobre o sub-indexado?</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Comparación de mi share total ({fmtPct(goldery?.shareVolumen ?? 0)}) contra mi share dentro de cada segmento y cada variedad.
+              Flecha verde = sobreindexado (gano más volumen del que me toca). Flecha roja = sub-indexado (pierdo volumen que me correspondería).
+            </div>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-5">
+            <FairShareTable titulo="Por agrupación de tamaño" rows={fairSeg} marcaPropia={settings.marcaPropia} />
+            <FairShareTable titulo="Por variedad / aroma" rows={fairVar} marcaPropia={settings.marcaPropia} />
+          </div>
+        </div>
+
+
+
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="panel p-5">
             <div className="text-sm font-semibold mb-1">Share por variedad / aroma</div>
@@ -176,5 +195,45 @@ function SharePage() {
         </div>
       </div>
     </>
+  );
+}
+
+function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: FairShareRow[]; marcaPropia: string }) {
+  const sorted = [...rows].sort((a, b) => Math.abs(b.gapPts) - Math.abs(a.gapPts));
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">{titulo}</div>
+      <table className="w-full text-xs">
+        <thead className="text-[10px] uppercase text-muted-foreground">
+          <tr className="border-b border-border">
+            <th className="py-1.5 text-left font-medium">Segmento</th>
+            <th className="py-1.5 text-right font-medium">Peso</th>
+            <th className="py-1.5 text-right font-medium">Share {marcaPropia}</th>
+            <th className="py-1.5 text-right font-medium">Brecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => {
+            const color = r.indicador === "sobre" ? "text-[color:var(--color-success)]"
+              : r.indicador === "sub" ? "text-[color:var(--color-danger)]"
+              : "text-muted-foreground";
+            const arrow = r.indicador === "sobre" ? "▲" : r.indicador === "sub" ? "▼" : "•";
+            return (
+              <tr key={r.segmento} className="border-b border-border/50">
+                <td className="py-1.5 truncate max-w-[180px]">{r.segmento}</td>
+                <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmtPct(r.pesoSegmento)}</td>
+                <td className="py-1.5 text-right tabular-nums">{fmtPct(r.shareEnSegmento)}</td>
+                <td className={`py-1.5 text-right tabular-nums font-semibold ${color}`}>
+                  {arrow} {r.gapPts > 0 ? "+" : ""}{r.gapPts.toFixed(1)} pts
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="mt-2 text-[10px] text-muted-foreground">
+        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}.
+      </div>
+    </div>
   );
 }

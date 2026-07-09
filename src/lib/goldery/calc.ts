@@ -445,3 +445,168 @@ export function suggestSegments(data: NormalizedSku[], k = 6): SegmentRange[] {
   }
   return out;
 }
+
+/* ============================================================
+ * Fair Share (estilo NielsenIQ/Circana)
+ * Compara el share total de Mi Marca en la categoría contra su share
+ * dentro de cada Agrupación de Tamaño y cada Variedad.
+ * ============================================================ */
+export interface FairShareRow {
+  segmento: string;                 // nombre del segmento o variedad
+  volumenSegmento: number;
+  volumenMiMarca: number;
+  shareEnSegmento: number;          // 0-1
+  shareReferencia: number;          // 0-1 (share total de mi marca)
+  gapPts: number;                   // (shareEnSegmento - shareReferencia) * 100
+  indicador: "sobre" | "sub" | "neutral";
+  pesoSegmento: number;             // 0-1, peso del segmento en la categoría
+}
+
+function fairShareGeneric(
+  data: NormalizedSku[],
+  key: (r: NormalizedSku) => string,
+): FairShareRow[] {
+  const totalCat = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const totalMi = data.filter((r) => r.esGoldery).reduce((s, r) => s + r.volumenMl, 0);
+  const shareRef = totalMi / totalCat;
+  const map = new Map<string, { vol: number; volMi: number }>();
+  for (const r of data) {
+    const k = key(r) || "Sin clasificar";
+    const cur = map.get(k) ?? { vol: 0, volMi: 0 };
+    cur.vol += r.volumenMl;
+    if (r.esGoldery) cur.volMi += r.volumenMl;
+    map.set(k, cur);
+  }
+  return [...map.entries()]
+    .map(([segmento, v]) => {
+      const shareEn = v.vol > 0 ? v.volMi / v.vol : 0;
+      const gapPts = (shareEn - shareRef) * 100;
+      return {
+        segmento,
+        volumenSegmento: v.vol,
+        volumenMiMarca: v.volMi,
+        shareEnSegmento: shareEn,
+        shareReferencia: shareRef,
+        gapPts,
+        indicador: gapPts > 1 ? "sobre" : gapPts < -1 ? "sub" : "neutral",
+        pesoSegmento: v.vol / totalCat,
+      } as FairShareRow;
+    })
+    .sort((a, b) => b.pesoSegmento - a.pesoSegmento);
+}
+
+export function fairShareBySegment(data: NormalizedSku[]): FairShareRow[] {
+  return fairShareGeneric(data, (r) => r.segmento);
+}
+export function fairShareByVariedad(data: NormalizedSku[]): FairShareRow[] {
+  return fairShareGeneric(data, (r) => r.variedad || "Sin variedad");
+}
+
+/* ============================================================
+ * Frecuencia de claims (estilo Mintel)
+ * Cuenta cuántas marcas de la categoría comunican cada claim y
+ * clasifica: "Apuesta de categoría" (>=50% de las marcas top) vs
+ * "Diferenciador" (pocos).
+ * ============================================================ */
+export interface ClaimFrequency {
+  claim: string;
+  numMarcas: number;
+  marcas: string[];
+  penetracion: number;             // numMarcas / marcasEnCategoria
+  tipo: "apuesta" | "diferenciador";
+  brechaCritica: boolean;          // apuesta + Mi Marca no lo tiene
+}
+
+export function claimFrequency(
+  claims: { claim: string; marcasUsan: string; loTieneGoldery: string }[],
+  data: NormalizedSku[],
+): ClaimFrequency[] {
+  const marcasCategoria = new Set(data.map((r) => r.marca));
+  const totalMarcas = Math.max(marcasCategoria.size, 3);
+  return claims.map((c) => {
+    const marcas = (c.marcasUsan || "")
+      .split(/[,;\/]/)
+      .map((m) => m.trim().toUpperCase())
+      .filter(Boolean);
+    const uniq = Array.from(new Set(marcas));
+    const penetracion = uniq.length / totalMarcas;
+    const tipo: ClaimFrequency["tipo"] =
+      uniq.length >= 3 || penetracion >= 0.4 ? "apuesta" : "diferenciador";
+    return {
+      claim: c.claim,
+      numMarcas: uniq.length,
+      marcas: uniq,
+      penetracion,
+      tipo,
+      brechaCritica: tipo === "apuesta" && c.loTieneGoldery !== "si",
+    };
+  });
+}
+
+/* ============================================================
+ * Snapshot para histórico de precios.
+ * Devuelve una foto plana (segmento, marcaRef, indice, precioMi, precioRef).
+ * ============================================================ */
+export interface PriceSnapshot {
+  fecha: string;                    // ISO
+  segmento: string;
+  marcaRef: string;
+  indice: number;
+  precioMlMi: number;
+  precioMlRef: number;
+  miPresente: boolean;
+}
+export function buildPriceSnapshot(data: NormalizedSku[], settings: Settings): PriceSnapshot[] {
+  const fecha = new Date().toISOString();
+  return priceComparisonBySegment(data, settings).map((c) => ({
+    fecha,
+    segmento: c.segmento,
+    marcaRef: c.marcaComparada,
+    indice: c.indice,
+    precioMlMi: c.precioMlMiMarca,
+    precioMlRef: c.precioMlComparado,
+    miPresente: c.miMarcaPresente,
+  }));
+}
+
+/* ============================================================
+ * Resumen ejecutivo por categoría — usado por dashboard integrado.
+ * ============================================================ */
+export interface CategorySummary {
+  share: number;                    // 0-1 share volumen mi marca
+  ranking: number;
+  numMarcas: number;
+  indicePrecioPromedio: number;     // ponderado por volumen del segmento
+  segmentosMasBarato: number;       // #segmentos con índice < 100
+  segmentosTotal: number;
+  claimsCubiertos: number;          // 0-1
+  claimsTotal: number;
+  claimsTengo: number;
+  tieneData: boolean;
+}
+export function categorySummary(
+  data: NormalizedSku[],
+  settings: Settings,
+  claims: { loTieneGoldery: string }[],
+): CategorySummary {
+  const brands = brandRanking(data);
+  const mi = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
+  const comps = priceComparisonBySegment(data, settings);
+  const compsMi = comps.filter((c) => c.miMarcaPresente && c.indice > 0);
+  const wTot = compsMi.reduce((s, c) => s + c.volumenSegmento, 0) || 1;
+  const idxProm = compsMi.reduce((s, c) => s + c.indice * c.volumenSegmento, 0) / wTot;
+  const barato = comps.filter((c) => c.semaforo === "verde").length;
+  const claimsTengo = claims.filter((c) => c.loTieneGoldery === "si").length;
+  return {
+    share: mi?.shareVolumen ?? 0,
+    ranking: mi?.rank ?? 0,
+    numMarcas: brands.length,
+    indicePrecioPromedio: compsMi.length ? idxProm : 0,
+    segmentosMasBarato: barato,
+    segmentosTotal: comps.length,
+    claimsCubiertos: claims.length ? claimsTengo / claims.length : 0,
+    claimsTotal: claims.length,
+    claimsTengo,
+    tieneData: data.length > 0,
+  };
+}

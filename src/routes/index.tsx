@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { analyzeSegments, brandRanking, paretoSkus } from "@/lib/goldery/calc";
+import { analyzeSegments, brandRanking, paretoSkus, categorySummary, normalizeRows } from "@/lib/goldery/calc";
 import { PageHeader, KpiCard, InsightCard, Chip, SoWhat, fmtNum, fmtPct, fmtMoney } from "@/components/goldery/ui";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Target, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowRight, Target, TrendingUp, AlertTriangle, LayoutGrid } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,7 +18,21 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const { data, settings, categoria, periodo } = useGoldery();
+  const { data, settings, categoria, periodo, categorias, categoriasGuardadas, claims, cambiarCategoria } = useGoldery();
+
+  // ------- Feature 4: resumen por categoría -------
+  const categoryCards = useMemo(() => {
+    return categorias.map((cat) => {
+      if (cat === categoria) {
+        return { cat, summary: categorySummary(data, settings, claims), activa: true };
+      }
+      const st = categoriasGuardadas[cat];
+      if (!st) return { cat, summary: categorySummary([], settings, []), activa: false };
+      const localSettings: typeof settings = { ...settings, liderManual: st.liderManual, comparacionesPrecio: st.comparacionesPrecio };
+      const norm = normalizeRows(st.rawRows, st.mapping, localSettings, cat);
+      return { cat, summary: categorySummary(norm, localSettings, st.claims), activa: false };
+    });
+  }, [categorias, categoriasGuardadas, categoria, data, settings, claims]);
 
   const brands = useMemo(() => brandRanking(data), [data]);
   const segs = useMemo(() => analyzeSegments(data, settings), [data, settings]);
@@ -48,6 +62,20 @@ function Dashboard() {
         subtitle={`Convierte data de autoservicio en decisiones de portafolio, precio, empaque y oportunidad — ${categoria} · ${periodo}`}
       />
       <div className="p-8 space-y-6">
+        {/* Feature 4 · Dashboard integrado por categoría */}
+        <div className="panel p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <LayoutGrid className="h-4 w-4 text-[color:var(--color-brand)]" />
+            <div className="text-sm font-semibold">Vista consolidada por categoría</div>
+            <div className="text-xs text-muted-foreground">· Click en una tarjeta para activarla</div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {categoryCards.map(({ cat, summary, activa }) => (
+              <CategoryCard key={cat} cat={cat} summary={summary} activa={activa} onClick={() => cambiarCategoria(cat)} marcaPropia={settings.marcaPropia} />
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <KpiCard
             label={`Share volumen ${settings.marcaPropia}`}
@@ -190,4 +218,61 @@ function rutaDescripcion(r: "no-hacer" | "ajuste" | "lanzar") {
     : r === "ajuste"
     ? "Goldery ya está. El problema no parece ser precio sino comunicación, empaque o claim. Ajustar antes de invertir en producto."
     : "La oportunidad no justifica inversión. Concentrar recursos en segmentos de mayor peso.";
+}
+
+function CategoryCard({
+  cat, summary, activa, onClick, marcaPropia,
+}: {
+  cat: string;
+  summary: ReturnType<typeof categorySummary>;
+  activa: boolean;
+  onClick: () => void;
+  marcaPropia: string;
+}) {
+  if (!summary.tieneData) {
+    return (
+      <button onClick={onClick} className={`text-left p-4 rounded-lg border ${activa ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50"} transition`}>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold truncate">{cat}</div>
+          {activa && <Chip tone="info">activa</Chip>}
+        </div>
+        <div className="mt-3 text-xs text-muted-foreground">Sin data cargada</div>
+      </button>
+    );
+  }
+  const shareTone = summary.share > 0.1 ? "good" : summary.share > 0.05 ? "warn" : "bad";
+  const idxTone = summary.indicePrecioPromedio === 0 ? "neutral" : summary.indicePrecioPromedio < 100 ? "good" : summary.indicePrecioPromedio < 110 ? "warn" : "bad";
+  const claimTone = summary.claimsCubiertos >= 0.7 ? "good" : summary.claimsCubiertos >= 0.4 ? "warn" : "bad";
+  const dot = (t: string) =>
+    t === "good" ? "bg-[color:var(--color-success)]" : t === "warn" ? "bg-[color:var(--color-warning)]" : t === "bad" ? "bg-[color:var(--color-danger)]" : "bg-muted-foreground/40";
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left p-4 rounded-lg border ${activa ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card hover:border-primary/50"} transition`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-semibold truncate">{cat}</div>
+        {activa ? <Chip tone="info">activa</Chip> : <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <MiniStat dot={dot(shareTone)} label={`Share ${marcaPropia}`} value={fmtPct(summary.share)} />
+        <MiniStat dot={dot(idxTone)} label="Índice precio" value={summary.indicePrecioPromedio > 0 ? fmtNum(summary.indicePrecioPromedio, 0) : "—"} />
+        <MiniStat dot={dot(claimTone)} label="Claims cubiertos" value={fmtPct(summary.claimsCubiertos)} />
+      </div>
+      <div className="mt-2 text-[10px] text-muted-foreground">
+        #{summary.ranking || "—"} de {summary.numMarcas} · más barato en {summary.segmentosMasBarato}/{summary.segmentosTotal} segm · {summary.claimsTengo}/{summary.claimsTotal} claims
+      </div>
+    </button>
+  );
+}
+function MiniStat({ dot, label, value }: { dot: string; label: string; value: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      </div>
+      <div className="text-sm font-bold tabular-nums mt-0.5">{value}</div>
+    </div>
+  );
 }
