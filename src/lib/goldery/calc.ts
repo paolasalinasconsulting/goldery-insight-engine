@@ -3,12 +3,12 @@ import { parseSize, toNumber, normalizeBrand } from "./parse";
 
 export const DEFAULT_SEGMENTS: SegmentRange[] = [
   { label: "Pequeño (0-500 ml)", min: 0, max: 500 },
-  { label: "900-1000 ml", min: 501, max: 1000 },
-  { label: "1300 ml", min: 1001, max: 1500 },
-  { label: "1800 ml", min: 1501, max: 2000 },
-  { label: "2500 ml", min: 2001, max: 2800 },
-  { label: "3000 ml", min: 2801, max: 3200 },
-  { label: "3500-4000 ml", min: 3201, max: 4500 },
+  { label: "~1000 ml", min: 501, max: 1200 },
+  { label: "~1300 ml", min: 1201, max: 1500 },
+  { label: "~1800 ml", min: 1501, max: 2200 },
+  { label: "~2500 ml", min: 2201, max: 2800 },
+  { label: "~3000 ml", min: 2801, max: 3400 },
+  { label: "~4000 ml", min: 3401, max: 4500 },
   { label: "5000 ml+", min: 4501, max: Infinity },
 ];
 
@@ -17,6 +17,8 @@ export const DEFAULT_SETTINGS: Settings = {
   marcasPropias: ["GOLDERY", "ANA", "ELIXIR", "REGENEXT", "BOMBA"],
   densidad: 1.0,
   segmentos: DEFAULT_SEGMENTS,
+  liderManual: undefined,
+  comparacionesPrecio: {},
   umbralOportunidad: { alta: 75, media: 50 },
   umbralIndicePrecio: { muyBarato: 85, valor: 95, paridad: 105, sobreprecio: 115 },
 };
@@ -25,20 +27,30 @@ export function segmentOf(ml: number, segs: SegmentRange[]): string {
   return segs.find((s) => ml >= s.min && ml <= s.max)?.label ?? "Sin clasificar";
 }
 
-export function normalizeRows(
+export interface NormalizeReport {
+  data: NormalizedSku[];
+  descartadas: { motivo: string; count: number }[];
+  sinPVP: number;
+}
+
+export function normalizeRowsReport(
   rows: RawRow[],
   mapping: Partial<Record<CanonicalField, string>>,
   settings: Settings,
   categoria: string,
-): NormalizedSku[] {
+): NormalizeReport {
   const out: NormalizedSku[] = [];
+  let sinMarca = 0, tamCero = 0, unidNoPos = 0, sinPVP = 0;
   rows.forEach((r, i) => {
     const get = (k: CanonicalField) => (mapping[k] ? r[mapping[k]!] : undefined);
     const tam = parseSize(get("tamano"));
     const unidades = toNumber(get("unidades"));
     const pvp = toNumber(get("pvp"));
     const marca = normalizeBrand(get("marca"));
-    if (!marca || tam.ml <= 0 || unidades <= 0) return;
+    if (!marca) { sinMarca++; return; }
+    if (tam.ml <= 0) { tamCero++; return; }
+    if (unidades <= 0) { unidNoPos++; return; }
+    if (pvp <= 0) sinPVP++;
     const volumenMl = unidades * tam.ml;
     const volumenL = volumenMl / 1000;
     const ventasValor = toNumber(get("ventasValor")) || unidades * pvp;
@@ -47,6 +59,7 @@ export function normalizeRows(
       categoria: String(get("categoria") ?? categoria ?? "").trim() || categoria,
       marca,
       descripcion: String(get("descripcion") ?? "").trim(),
+      variedad: String(get("variedad") ?? "").trim() || "Sin variedad",
       empaque: String(get("empaque") ?? "").trim(),
       tamanoMl: tam.ml,
       unidad: tam.unidad,
@@ -61,7 +74,21 @@ export function normalizeRows(
       esGoldery: settings.marcasPropias.includes(marca) || marca === settings.marcaPropia,
     });
   });
-  return out;
+  const descartadas = [
+    { motivo: "Sin marca", count: sinMarca },
+    { motivo: "Tamaño no legible", count: tamCero },
+    { motivo: "Unidades ≤ 0", count: unidNoPos },
+  ].filter((d) => d.count > 0);
+  return { data: out, descartadas, sinPVP };
+}
+
+export function normalizeRows(
+  rows: RawRow[],
+  mapping: Partial<Record<CanonicalField, string>>,
+  settings: Settings,
+  categoria: string,
+): NormalizedSku[] {
+  return normalizeRowsReport(rows, mapping, settings, categoria).data;
 }
 
 export interface BrandAgg {
@@ -104,6 +131,16 @@ export function brandRanking(data: NormalizedSku[]): BrandAgg[] {
   return arr;
 }
 
+/** Determina el líder de la categoría: manual si está definido, si no el top por volumen. */
+export function categoryLeader(data: NormalizedSku[], settings: Settings): string {
+  const brands = brandRanking(data);
+  if (settings.liderManual && brands.some((b) => b.marca === settings.liderManual)) {
+    return settings.liderManual;
+  }
+  const primerNoPropio = brands.find((b) => !b.esGoldery);
+  return primerNoPropio?.marca ?? brands[0]?.marca ?? "";
+}
+
 export interface ParetoSku extends NormalizedSku {
   shareVolumen: number;
   acumulado: number;
@@ -121,6 +158,143 @@ export function paretoSkus(data: NormalizedSku[]): ParetoSku[] {
   });
 }
 
+/** Share por segmento × marca (para gráfico de barras apiladas). */
+export interface SegmentShareStack {
+  segmento: string;
+  volumenTotal: number;
+  marcas: Record<string, number>; // marca -> share dentro del segmento (0-1)
+  volumenPorMarca: Record<string, number>;
+}
+export function segmentBrandShare(data: NormalizedSku[], settings: Settings): SegmentShareStack[] {
+  const out: SegmentShareStack[] = [];
+  for (const seg of settings.segmentos) {
+    const rows = data.filter((r) => r.segmento === seg.label);
+    if (rows.length === 0) continue;
+    const total = rows.reduce((s, r) => s + r.volumenMl, 0) || 1;
+    const marcas: Record<string, number> = {};
+    const volumenPorMarca: Record<string, number> = {};
+    for (const r of rows) {
+      volumenPorMarca[r.marca] = (volumenPorMarca[r.marca] ?? 0) + r.volumenMl;
+    }
+    Object.entries(volumenPorMarca).forEach(([m, v]) => (marcas[m] = v / total));
+    out.push({ segmento: seg.label, volumenTotal: total, marcas, volumenPorMarca });
+  }
+  return out;
+}
+
+/** Share por Variedad / Aroma (todas las marcas). */
+export interface VarietyShare {
+  variedad: string;
+  volumenMl: number;
+  shareVolumen: number;
+  volumenGoldery: number;
+  shareGolderyEnVariedad: number;
+}
+export function varietyShare(data: NormalizedSku[]): VarietyShare[] {
+  const total = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const map = new Map<string, { vol: number; volG: number }>();
+  for (const r of data) {
+    const k = r.variedad || "Sin variedad";
+    const cur = map.get(k) ?? { vol: 0, volG: 0 };
+    cur.vol += r.volumenMl;
+    if (r.esGoldery) cur.volG += r.volumenMl;
+    map.set(k, cur);
+  }
+  return [...map.entries()]
+    .map(([variedad, v]) => ({
+      variedad,
+      volumenMl: v.vol,
+      shareVolumen: v.vol / total,
+      volumenGoldery: v.volG,
+      shareGolderyEnVariedad: v.vol > 0 ? v.volG / v.vol : 0,
+    }))
+    .sort((a, b) => b.volumenMl - a.volumenMl);
+}
+
+/** Matriz de precio/ml por segmento × marca, independiente del share. */
+export interface PriceRow {
+  segmento: string;
+  marca: string;
+  precioMlPromedio: number;
+  volumenMl: number;
+  unidades: number;
+  esGoldery: boolean;
+}
+export function priceMatrix(data: NormalizedSku[]): PriceRow[] {
+  const map = new Map<string, PriceRow & { _sumPvp: number }>();
+  for (const r of data) {
+    if (r.tamanoMl <= 0 || r.pvp <= 0) continue;
+    const k = `${r.segmento}||${r.marca}`;
+    const cur = map.get(k) ?? {
+      segmento: r.segmento, marca: r.marca,
+      precioMlPromedio: 0, volumenMl: 0, unidades: 0,
+      esGoldery: r.esGoldery, _sumPvp: 0,
+    };
+    // promedio ponderado por unidades del precio/ml
+    cur._sumPvp += r.precioPorMl * r.unidades;
+    cur.volumenMl += r.volumenMl;
+    cur.unidades += r.unidades;
+    map.set(k, cur);
+  }
+  const out: PriceRow[] = [];
+  for (const v of map.values()) {
+    out.push({
+      segmento: v.segmento,
+      marca: v.marca,
+      precioMlPromedio: v.unidades > 0 ? v._sumPvp / v.unidades : 0,
+      volumenMl: v.volumenMl,
+      unidades: v.unidades,
+      esGoldery: v.esGoldery,
+    });
+  }
+  return out;
+}
+
+export interface PriceComparison {
+  segmento: string;
+  marcaComparada: string;      // marca contra la que se compara
+  precioMlComparado: number;
+  precioMlMiMarca: number;
+  indice: number;              // (miMarca / comparada) * 100; 0 si sin presencia
+  miMarcaPresente: boolean;
+  volumenSegmento: number;
+  semaforo: "verde" | "rojo" | "gris";
+}
+export function priceComparisonBySegment(
+  data: NormalizedSku[],
+  settings: Settings,
+): PriceComparison[] {
+  const matrix = priceMatrix(data);
+  const out: PriceComparison[] = [];
+  for (const seg of settings.segmentos) {
+    const rows = matrix.filter((r) => r.segmento === seg.label);
+    if (rows.length === 0) continue;
+    const marcasEnSeg = rows.slice().sort((a, b) => b.volumenMl - a.volumenMl);
+    // marca elegida: la del override, si existe en el segmento; si no, la de mayor volumen no-propia; si no, la mayor
+    let elegida = settings.comparacionesPrecio[seg.label];
+    if (!elegida || !marcasEnSeg.some((m) => m.marca === elegida)) {
+      elegida = marcasEnSeg.find((m) => !m.esGoldery)?.marca ?? marcasEnSeg[0].marca;
+    }
+    const comparada = rows.find((r) => r.marca === elegida)!;
+    const mi = rows.find((r) => r.esGoldery && r.marca !== elegida) ?? rows.find((r) => r.esGoldery);
+    const volSeg = rows.reduce((s, r) => s + r.volumenMl, 0);
+    const indice = mi && comparada.precioMlPromedio > 0
+      ? (mi.precioMlPromedio / comparada.precioMlPromedio) * 100
+      : 0;
+    out.push({
+      segmento: seg.label,
+      marcaComparada: elegida,
+      precioMlComparado: comparada.precioMlPromedio,
+      precioMlMiMarca: mi?.precioMlPromedio ?? 0,
+      indice,
+      miMarcaPresente: !!mi,
+      volumenSegmento: volSeg,
+      semaforo: !mi ? "gris" : indice < 100 ? "verde" : "rojo",
+    });
+  }
+  return out;
+}
+
 export interface SegmentAnalysis {
   segmento: string;
   volumenMl: number;
@@ -133,7 +307,7 @@ export interface SegmentAnalysis {
   gapVsLider: number;
   precioMlLider: number;
   precioMlGoldery: number;
-  indicePrecio: number;       // 0 if no presence
+  indicePrecio: number;
   participaGoldery: boolean;
   scoreOportunidad: number;
   nivelOportunidad: "Alta" | "Media" | "Baja";
@@ -143,6 +317,7 @@ export interface SegmentAnalysis {
 
 export function analyzeSegments(data: NormalizedSku[], settings: Settings): SegmentAnalysis[] {
   const totalCat = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const liderCategoria = categoryLeader(data, settings);
   const out: SegmentAnalysis[] = [];
   for (const seg of settings.segmentos) {
     const rows = data.filter((r) => r.segmento === seg.label);
@@ -150,18 +325,22 @@ export function analyzeSegments(data: NormalizedSku[], settings: Settings): Segm
     const volumenMl = rows.reduce((s, r) => s + r.volumenMl, 0);
     const pesoCategoria = volumenMl / totalCat;
 
-    const byBrand = new Map<string, { vol: number; precioMl: number; n: number; esGoldery: boolean }>();
+    const byBrand = new Map<string, { vol: number; sumPvp: number; unidades: number; esGoldery: boolean }>();
     for (const r of rows) {
-      const cur = byBrand.get(r.marca) ?? { vol: 0, precioMl: 0, n: 0, esGoldery: r.esGoldery };
+      const cur = byBrand.get(r.marca) ?? { vol: 0, sumPvp: 0, unidades: 0, esGoldery: r.esGoldery };
       cur.vol += r.volumenMl;
-      cur.precioMl += r.precioPorMl;
-      cur.n += 1;
+      cur.sumPvp += r.precioPorMl * r.unidades;
+      cur.unidades += r.unidades;
       byBrand.set(r.marca, cur);
     }
     const brands = [...byBrand.entries()]
-      .map(([marca, v]) => ({ marca, vol: v.vol, precioMl: v.precioMl / v.n, esGoldery: v.esGoldery }))
+      .map(([marca, v]) => ({
+        marca, vol: v.vol,
+        precioMl: v.unidades > 0 ? v.sumPvp / v.unidades : 0,
+        esGoldery: v.esGoldery,
+      }))
       .sort((a, b) => b.vol - a.vol);
-    const lider = brands[0];
+    const lider = brands.find((b) => b.marca === liderCategoria) ?? brands[0];
 
     const goldery = brands.find((b) => b.esGoldery);
     const participa = !!goldery;
@@ -172,36 +351,29 @@ export function analyzeSegments(data: NormalizedSku[], settings: Settings): Segm
       ? (goldery.precioMl / lider.precioMl) * 100
       : 0;
 
-    // Opportunity score
-    const pesoPts = Math.min(pesoCategoria * 100, 40);                 // 0-40
-    const ausenciaPts = participa
-      ? Math.max(0, 25 - shareGolderyEnSegmento * 100)
-      : 25;                                                             // 0-25
-    const liderConc = (lider.vol / volumenMl) * 15;                    // 0-15
+    const pesoPts = Math.min(pesoCategoria * 100, 40);
+    const ausenciaPts = participa ? Math.max(0, 25 - shareGolderyEnSegmento * 100) : 25;
+    const liderConc = (lider.vol / volumenMl) * 15;
     const precioPts = indicePrecio === 0 ? 7 : indicePrecio < 105 ? 10 : indicePrecio < 115 ? 6 : 3;
     const factibilidad = participa ? 8 : 6;
     const score = Math.round(pesoPts + ausenciaPts + liderConc + precioPts + factibilidad);
 
-    const nivel = score >= settings.umbralOportunidad.alta
-      ? "Alta"
-      : score >= settings.umbralOportunidad.media
-        ? "Media"
-        : "Baja";
+    const nivel = score >= settings.umbralOportunidad.alta ? "Alta"
+      : score >= settings.umbralOportunidad.media ? "Media" : "Baja";
 
-    // Diagnóstico
     let diagnostico = "";
     let recomendacion: SegmentAnalysis["recomendacion"] = "no-hacer";
     if (!participa && pesoCategoria > 0.1) {
-      diagnostico = `Goldery no participa en un segmento que concentra el ${(pesoCategoria * 100).toFixed(1)}% de la categoría. Líder ${lider.marca} domina con ${((lider.vol / volumenMl) * 100).toFixed(0)}%.`;
+      diagnostico = `${settings.marcaPropia} no participa en un segmento que concentra el ${(pesoCategoria * 100).toFixed(1)}% de la categoría. Líder ${lider.marca} domina con ${((lider.vol / volumenMl) * 100).toFixed(0)}%.`;
       recomendacion = nivel === "Baja" ? "no-hacer" : "lanzar";
     } else if (participa && indicePrecio > 0 && indicePrecio < 95 && shareGolderyEnSegmento < 0.1) {
-      diagnostico = `Goldery compite con ventaja de precio (índice ${indicePrecio.toFixed(0)}) frente a ${lider.marca}, pero el bajo share (${(shareGolderyEnSegmento * 100).toFixed(1)}%) sugiere problema de comunicación, empaque o credibilidad.`;
+      diagnostico = `${settings.marcaPropia} compite con ventaja de precio (índice ${indicePrecio.toFixed(0)}) frente a ${lider.marca}, pero el bajo share (${(shareGolderyEnSegmento * 100).toFixed(1)}%) sugiere problema de comunicación, empaque o credibilidad.`;
       recomendacion = "ajuste";
     } else if (participa && indicePrecio > 115) {
-      diagnostico = `Goldery está sobreindexada en precio (índice ${indicePrecio.toFixed(0)}); riesgo de baja conversión vs ${lider.marca}.`;
+      diagnostico = `${settings.marcaPropia} está sobreindexada en precio (índice ${indicePrecio.toFixed(0)}); riesgo de baja conversión vs ${lider.marca}.`;
       recomendacion = "ajuste";
     } else if (participa && shareGolderyEnSegmento > 0.15) {
-      diagnostico = `Goldery tiene posición sólida (${(shareGolderyEnSegmento * 100).toFixed(1)}% del segmento). Mantener y proteger.`;
+      diagnostico = `${settings.marcaPropia} tiene posición sólida (${(shareGolderyEnSegmento * 100).toFixed(1)}% del segmento). Mantener y proteger.`;
       recomendacion = "no-hacer";
     } else if (!participa) {
       diagnostico = `Segmento marginal (${(pesoCategoria * 100).toFixed(1)}%); la inversión no se justifica.`;
@@ -245,4 +417,31 @@ export function priceDiagnosis(indice: number, umbral: Settings["umbralIndicePre
   if (indice < umbral.paridad) return { level: "paridad", label: "Paridad con líder", tone: "good" };
   if (indice < umbral.sobreprecio) return { level: "moderado", label: "Sobreprecio moderado", tone: "warn" };
   return { level: "alto", label: "Sobreprecio alto", tone: "bad" };
+}
+
+/** Clustering 1D simple sobre tamaños reales — sugiere agrupación automática. */
+export function suggestSegments(data: NormalizedSku[], k = 6): SegmentRange[] {
+  const sizes = data.map((r) => r.tamanoMl).filter((s) => s > 0).sort((a, b) => a - b);
+  if (sizes.length === 0) return DEFAULT_SEGMENTS;
+  const uniq = Array.from(new Set(sizes));
+  const buckets = Math.min(k, uniq.length);
+  // partición equifrecuente
+  const out: SegmentRange[] = [];
+  const step = Math.floor(sizes.length / buckets);
+  let prevMax = 0;
+  for (let i = 0; i < buckets; i++) {
+    const startIdx = i * step;
+    const endIdx = i === buckets - 1 ? sizes.length - 1 : (i + 1) * step - 1;
+    const slice = sizes.slice(startIdx, endIdx + 1);
+    const min = prevMax + 1;
+    const max = i === buckets - 1 ? Infinity : slice[slice.length - 1];
+    const centro = Math.round(slice[Math.floor(slice.length / 2)]);
+    out.push({
+      label: max === Infinity ? `${centro}+ ml` : `~${centro} ml`,
+      min: i === 0 ? 0 : min,
+      max,
+    });
+    prevMax = max;
+  }
+  return out;
 }
