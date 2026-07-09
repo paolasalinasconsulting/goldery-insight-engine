@@ -149,6 +149,7 @@ export const useGoldery = create<GolderyState>()(
           claims: s.claims, packChecks: s.packChecks,
           liderManual: s.settings.liderManual,
           comparacionesPrecio: s.settings.comparacionesPrecio,
+          priceHistory: s.priceHistory ?? [],
         };
         const guardadas = { ...s.categoriasGuardadas, [s.categoria]: snapshot };
         const destino = guardadas[c] ?? estadoBlanco();
