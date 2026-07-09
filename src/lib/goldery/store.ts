@@ -75,6 +75,9 @@ interface GolderyState {
   setClaims: (c: ClaimRow[]) => void;
   setPackChecks: (p: PackChecklist[]) => void;
   setMercadito: (which: "A" | "B", patch: Partial<MercaditoScenario>) => void;
+  exportBackup: () => string;
+  importBackup: (json: string) => { ok: boolean; error?: string };
+  clearPriceHistory: () => void;
 }
 
 const DEFAULT_CLAIMS: ClaimRow[] = [
