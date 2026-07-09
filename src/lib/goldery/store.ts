@@ -99,14 +99,25 @@ const blankMerc = (n: string): MercaditoScenario => ({
   intencion: 32, preferencia: 28, calidad: 60, ahorro: 55, claridad: 50, comentarios: "",
 });
 
-function estadoBlanco(): CategoriaState {
+function estadoBlanco(seedClaims: ClaimRow[] = []): CategoriaState {
   return {
     rawRows: [], rawColumns: [], mapping: {}, fileName: "(sin datos)",
     periodo: "2025-Q3", cadena: "Autoservicio Nacional", pais: "Ecuador",
-    claims: DEFAULT_CLAIMS, packChecks: DEFAULT_PACK,
+    claims: seedClaims, packChecks: DEFAULT_PACK,
     liderManual: undefined, comparacionesPrecio: {},
     priceHistory: [],
   };
+}
+
+/** Compara si dos arrays de claims son estructuralmente iguales (mismos textos y estados). */
+function sameClaims(a: ClaimRow[], b: ClaimRow[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((c, i) =>
+    c.claim === b[i].claim &&
+    c.marcasUsan === b[i].marcasUsan &&
+    c.loUsaLider === b[i].loUsaLider &&
+    c.loTieneGoldery === b[i].loTieneGoldery
+  );
 }
 
 function proyectar(state: CategoriaState, settings: Settings, categoria: string) {
