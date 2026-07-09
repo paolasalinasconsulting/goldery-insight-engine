@@ -197,3 +197,43 @@ function SharePage() {
     </>
   );
 }
+
+function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: FairShareRow[]; marcaPropia: string }) {
+  const sorted = [...rows].sort((a, b) => Math.abs(b.gapPts) - Math.abs(a.gapPts));
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">{titulo}</div>
+      <table className="w-full text-xs">
+        <thead className="text-[10px] uppercase text-muted-foreground">
+          <tr className="border-b border-border">
+            <th className="py-1.5 text-left font-medium">Segmento</th>
+            <th className="py-1.5 text-right font-medium">Peso</th>
+            <th className="py-1.5 text-right font-medium">Share {marcaPropia}</th>
+            <th className="py-1.5 text-right font-medium">Brecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => {
+            const color = r.indicador === "sobre" ? "text-[color:var(--color-success)]"
+              : r.indicador === "sub" ? "text-[color:var(--color-danger)]"
+              : "text-muted-foreground";
+            const arrow = r.indicador === "sobre" ? "▲" : r.indicador === "sub" ? "▼" : "•";
+            return (
+              <tr key={r.segmento} className="border-b border-border/50">
+                <td className="py-1.5 truncate max-w-[180px]">{r.segmento}</td>
+                <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmtPct(r.pesoSegmento)}</td>
+                <td className="py-1.5 text-right tabular-nums">{fmtPct(r.shareEnSegmento)}</td>
+                <td className={`py-1.5 text-right tabular-nums font-semibold ${color}`}>
+                  {arrow} {r.gapPts > 0 ? "+" : ""}{r.gapPts.toFixed(1)} pts
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="mt-2 text-[10px] text-muted-foreground">
+        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}.
+      </div>
+    </div>
+  );
+}
