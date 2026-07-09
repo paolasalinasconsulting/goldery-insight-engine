@@ -16,9 +16,27 @@ export const Route = createFileRoute("/precios")({
 });
 
 function PreciosPage() {
-  const { data, settings, setComparacionPrecio } = useGoldery();
+  const { data, settings, setComparacionPrecio, priceHistory, clearPriceHistory } = useGoldery();
   const matrix = useMemo(() => priceMatrix(data), [data]);
   const comps = useMemo(() => priceComparisonBySegment(data, settings), [data, settings]);
+
+  // Feature 2 · Histórico: agrupar por segmento y fecha (día)
+  const historico = useMemo(() => {
+    const byFecha = new Map<string, Record<string, number | string>>();
+    (priceHistory ?? []).forEach((h) => {
+      const dia = h.fecha.slice(0, 10);
+      const row = byFecha.get(dia) ?? { fecha: dia };
+      if (h.indice > 0) row[h.segmento] = +h.indice.toFixed(1);
+      byFecha.set(dia, row);
+    });
+    return [...byFecha.values()].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  }, [priceHistory]);
+  const segmentosEnHist = useMemo(() => {
+    const set = new Set<string>();
+    (priceHistory ?? []).forEach((h) => { if (h.indice > 0) set.add(h.segmento); });
+    return [...set];
+  }, [priceHistory]);
+  const HIST_PALETTE = ["#06B6D4", "#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#14B8A6"];
 
   const marcasPorSegmento = useMemo(() => {
     const m: Record<string, string[]> = {};
