@@ -78,6 +78,7 @@ interface GolderyState {
   exportBackup: () => string;
   importBackup: (json: string) => { ok: boolean; error?: string };
   clearPriceHistory: () => void;
+  consolidarDuplicados: (keys: string[]) => number;
 }
 
 const DEFAULT_CLAIMS: ClaimRow[] = [
