@@ -47,14 +47,35 @@ function TriSelect({ value, onChange }: { value: TriState; onChange: (v: TriStat
 }
 
 function ClaimsPage() {
-  const { claims, setClaims } = useGoldery();
+  const { claims, setClaims, data } = useGoldery();
+
+  const freq = useMemo(() => claimFrequency(claims, data), [claims, data]);
+  const freqByClaim = useMemo(() => {
+    const m = new Map<string, typeof freq[number]>();
+    freq.forEach((f) => m.set(f.claim, f));
+    return m;
+  }, [freq]);
+
+  // Ordenar: brechas críticas (apuesta + no lo tengo) primero, luego apuestas, luego diferenciadores
+  const orderedIdx = useMemo(() => {
+    return claims
+      .map((c, i) => ({ c, i, f: freqByClaim.get(c.claim) }))
+      .sort((a, b) => {
+        const scoreA = a.f?.brechaCritica ? 0 : a.f?.tipo === "apuesta" ? 1 : 2;
+        const scoreB = b.f?.brechaCritica ? 0 : b.f?.tipo === "apuesta" ? 1 : 2;
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        return (b.f?.numMarcas ?? 0) - (a.f?.numMarcas ?? 0);
+      })
+      .map((x) => x.i);
+  }, [claims, freqByClaim]);
 
   const kpis = useMemo(() => {
     const tengo = claims.filter((c) => c.loTieneGoldery === "si").length;
     const meToo = claims.filter((c) => c.loUsaLider && c.loTieneGoldery === "no" && c.goldery_puede === "si").length;
     const noEntienden = claims.filter((c) => c.loTieneGoldery === "si" && c.consumidor_entiende === "no").length;
-    return { tengo, meToo, noEntienden };
-  }, [claims]);
+    const brechasCat = freq.filter((f) => f.brechaCritica).length;
+    return { tengo, meToo, noEntienden, brechasCat };
+  }, [claims, freq]);
 
   const update = (i: number, patch: Partial<ClaimRow>) => {
     const next = [...claims];
