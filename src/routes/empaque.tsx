@@ -85,6 +85,40 @@ function PackPage() {
         <button onClick={addSku} className="text-sm px-4 py-2 rounded-md border border-border hover:bg-muted">
           + Agregar SKU al diagnóstico
         </button>
+
+        <div className="panel p-5 text-sm text-muted-foreground leading-relaxed">
+          <div className="text-xs uppercase tracking-[0.09em] font-semibold text-foreground mb-2">
+            ¿Cómo se calcula el Silent Seller Score?
+          </div>
+          <p className="mb-3">
+            El empaque es un vendedor silencioso: en góndola tiene menos de 3 segundos para
+            comunicar categoría, beneficio y diferenciación. El score evalúa 10 criterios
+            binarios (Sí / No) sobre qué tan bien el empaque cumple ese rol frente al líder.
+            Cada criterio cumplido suma 10 puntos, sobre un total de 100.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-3 mb-3">
+            <div className="rounded-md border border-border p-3">
+              <div className="flex items-center gap-2 mb-1"><Chip tone="good">71 – 100</Chip><span className="font-semibold">Competitivo en percha</span></div>
+              <div className="text-xs">Comunica beneficio, categoría y diferenciación. Compite visualmente contra el líder.</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="flex items-center gap-2 mb-1"><Chip tone="warn">41 – 70</Chip><span className="font-semibold">Funcional, mejorable</span></div>
+              <div className="text-xs">Cumple lo básico pero desperdicia frente: claim débil, jerarquía confusa o códigos de categoría ausentes.</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="flex items-center gap-2 mb-1"><Chip tone="bad">0 – 40</Chip><span className="font-semibold">Empaque débil</span></div>
+              <div className="text-xs">No vende solo. Requiere rediseño priorizando beneficio, claim principal y códigos visuales de la categoría.</div>
+            </div>
+          </div>
+          <p className="text-xs">
+            Los 10 criterios evalúan: comprensión de categoría, beneficio principal, jerarquía
+            del claim vs. logo, claridad de variedad y tamaño, comunicación de ahorro o
+            rendimiento, uso de códigos visuales de la categoría, comparabilidad visual con el
+            líder, ausencia de exceso de información y dominancia adecuada del logo. La
+            recomendación práctica: antes de rediseñar todo el empaque, ataca los 3 ítems con
+            menor cumplimiento — normalmente ahí está el mayor retorno.
+          </p>
+        </div>
       </div>
     </>
   );
