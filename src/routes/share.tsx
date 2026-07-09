@@ -23,8 +23,9 @@ const PALETTE = ["#1E3A8A", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6
 const MI_COLOR = "#06B6D4";
 
 function SharePage() {
-  const { data, settings } = useGoldery();
+  const { data, settings, rawRows, mapping } = useGoldery();
   const brands = useMemo(() => brandRanking(data), [data]);
+  const uncl = useMemo(() => unclassifiedStats(rawRows, mapping, data), [rawRows, mapping, data]);
   const goldery = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
   const stacks = useMemo(() => segmentBrandShare(data, settings), [data, settings]);
   const variedades = useMemo(() => varietyShare(data), [data]);
