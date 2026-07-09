@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { useGoldery } from "@/lib/goldery/store";
 import {
   analyzeSegments, brandRanking, paretoSkus, priceComparisonBySegment, varietyShare,
+  fairShareBySegment, fairShareByVariedad, claimFrequency,
 } from "@/lib/goldery/calc";
 import { PageHeader, Chip } from "@/components/goldery/ui";
-import { FileSpreadsheet, FileText, Download } from "lucide-react";
+import { FileSpreadsheet, FileText, Download, Save, Upload } from "lucide-react";
 
 export const Route = createFileRoute("/exportar")({
   head: () => ({
