@@ -218,7 +218,18 @@ export const useGoldery = create<GolderyState>()(
 
       recalc: () => {
         const s = get();
-        set({ data: normalizeRows(s.rawRows, s.mapping, s.settings, s.categoria) });
+        const data = normalizeRows(s.rawRows, s.mapping, s.settings, s.categoria);
+        // snapshot histórico: solo si hay data y no hay uno del mismo día
+        let priceHistory = s.priceHistory ?? [];
+        if (data.length > 0) {
+          const snap = buildPriceSnapshot(data, s.settings);
+          const hoy = new Date().toISOString().slice(0, 10);
+          const yaHoy = priceHistory.some((h) => h.fecha.slice(0, 10) === hoy);
+          if (!yaHoy && snap.length > 0) {
+            priceHistory = [...priceHistory, ...snap].slice(-2000); // cap
+          }
+        }
+        set({ data, priceHistory });
       },
       loadMock: () => {
         const rows = buildMockRows();
@@ -238,11 +249,59 @@ export const useGoldery = create<GolderyState>()(
         const s = get();
         const next = { ...s.settings.comparacionesPrecio, [segmento]: marca };
         set({ settings: { ...s.settings, comparacionesPrecio: next } });
+        get().recalc();
       },
       setClaims: (c) => set({ claims: c }),
       setPackChecks: (p) => set({ packChecks: p }),
       setMercadito: (which, patch) =>
         set((s) => which === "A" ? { mercaditoA: { ...s.mercaditoA, ...patch } } : { mercaditoB: { ...s.mercaditoB, ...patch } }),
+
+      exportBackup: () => {
+        const s = get();
+        // consolidar snapshot de categoría activa antes de exportar
+        const snap: CategoriaState = {
+          rawRows: s.rawRows, rawColumns: s.rawColumns, mapping: s.mapping,
+          fileName: s.fileName, periodo: s.periodo, cadena: s.cadena, pais: s.pais,
+          claims: s.claims, packChecks: s.packChecks,
+          liderManual: s.settings.liderManual,
+          comparacionesPrecio: s.settings.comparacionesPrecio,
+          priceHistory: s.priceHistory ?? [],
+        };
+        const payload = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          categoria: s.categoria,
+          categorias: s.categorias,
+          categoriasGuardadas: { ...s.categoriasGuardadas, [s.categoria]: snap },
+          settings: s.settings,
+          mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
+        };
+        return JSON.stringify(payload, null, 2);
+      },
+      importBackup: (json) => {
+        try {
+          const p = JSON.parse(json);
+          if (!p || typeof p !== "object" || !p.categorias || !p.categoriasGuardadas) {
+            return { ok: false, error: "Formato no reconocido" };
+          }
+          const cat = p.categoria ?? p.categorias[0];
+          const dest: CategoriaState = { ...estadoBlanco(), ...(p.categoriasGuardadas[cat] ?? {}) };
+          set({
+            categoria: cat,
+            categorias: p.categorias,
+            categoriasGuardadas: p.categoriasGuardadas,
+            settings: p.settings ?? DEFAULT_SETTINGS,
+            mercaditoA: p.mercaditoA ?? get().mercaditoA,
+            mercaditoB: p.mercaditoB ?? get().mercaditoB,
+            ...dest,
+          });
+          get().recalc();
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: (e as Error).message };
+        }
+      },
+      clearPriceHistory: () => set({ priceHistory: [] }),
     }),
     {
       name: "categoryiq-store-v1",
@@ -254,6 +313,7 @@ export const useGoldery = create<GolderyState>()(
         periodo: s.periodo, cadena: s.cadena, pais: s.pais, fileName: s.fileName,
         rawRows: s.rawRows, rawColumns: s.rawColumns, mapping: s.mapping,
         settings: s.settings, claims: s.claims, packChecks: s.packChecks,
+        priceHistory: s.priceHistory,
         mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
       }),
       onRehydrateStorage: () => (state) => {
