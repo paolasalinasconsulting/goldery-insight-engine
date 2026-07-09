@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CanonicalField, ClaimRow, NormalizedSku, RawRow, Settings } from "./types";
-import { DEFAULT_SETTINGS, normalizeRows } from "./calc";
+import { DEFAULT_SETTINGS, normalizeRows, buildPriceSnapshot, type PriceSnapshot } from "./calc";
 import { buildMockRows, MOCK_COLUMN_MAP } from "./mock";
 
 export interface PackChecklist {
