@@ -221,17 +221,17 @@ export interface PriceRow {
   esGoldery: boolean;
 }
 export function priceMatrix(data: NormalizedSku[]): PriceRow[] {
-  const map = new Map<string, PriceRow & { _sumPvp: number }>();
+  const map = new Map<string, PriceRow & { _sumValor: number }>();
   for (const r of data) {
     if (r.tamanoMl <= 0 || r.pvp <= 0) continue;
     const k = `${r.segmento}||${r.marca}`;
     const cur = map.get(k) ?? {
       segmento: r.segmento, marca: r.marca,
       precioMlPromedio: 0, volumenMl: 0, unidades: 0,
-      esGoldery: r.esGoldery, _sumPvp: 0,
+      esGoldery: r.esGoldery, _sumValor: 0,
     };
-    // promedio ponderado por unidades del precio/ml
-    cur._sumPvp += r.precioPorMl * r.unidades;
+    // precio/ml ponderado por volumen: sum(pvp*unidades) / sum(volumenMl)
+    cur._sumValor += r.pvp * r.unidades;
     cur.volumenMl += r.volumenMl;
     cur.unidades += r.unidades;
     map.set(k, cur);
@@ -241,7 +241,7 @@ export function priceMatrix(data: NormalizedSku[]): PriceRow[] {
     out.push({
       segmento: v.segmento,
       marca: v.marca,
-      precioMlPromedio: v.unidades > 0 ? v._sumPvp / v.unidades : 0,
+      precioMlPromedio: v.volumenMl > 0 ? v._sumValor / v.volumenMl : 0,
       volumenMl: v.volumenMl,
       unidades: v.unidades,
       esGoldery: v.esGoldery,
@@ -258,6 +258,7 @@ export interface PriceComparison {
   indice: number;              // (miMarca / comparada) * 100; 0 si sin presencia
   miMarcaPresente: boolean;
   volumenSegmento: number;
+  volumenMiMarca: number;      // volumen de mi marca dentro del segmento (para ponderar)
   semaforo: "verde" | "rojo" | "gris";
 }
 export function priceComparisonBySegment(
@@ -265,31 +266,43 @@ export function priceComparisonBySegment(
   settings: Settings,
 ): PriceComparison[] {
   const matrix = priceMatrix(data);
+  const liderCat = categoryLeader(data, settings);
   const out: PriceComparison[] = [];
   for (const seg of settings.segmentos) {
     const rows = matrix.filter((r) => r.segmento === seg.label);
     if (rows.length === 0) continue;
     const marcasEnSeg = rows.slice().sort((a, b) => b.volumenMl - a.volumenMl);
-    // marca elegida: la del override, si existe en el segmento; si no, la de mayor volumen no-propia; si no, la mayor
+    // Referencia: (1) override manual por segmento, (2) líder de categoría si compite en el segmento,
+    // (3) mayor volumen no-propia, (4) mayor volumen del segmento.
     let elegida = settings.comparacionesPrecio[seg.label];
     if (!elegida || !marcasEnSeg.some((m) => m.marca === elegida)) {
-      elegida = marcasEnSeg.find((m) => !m.esGoldery)?.marca ?? marcasEnSeg[0].marca;
+      if (liderCat && marcasEnSeg.some((m) => m.marca === liderCat)) {
+        elegida = liderCat;
+      } else {
+        elegida = marcasEnSeg.find((m) => !m.esGoldery)?.marca ?? marcasEnSeg[0].marca;
+      }
     }
     const comparada = rows.find((r) => r.marca === elegida)!;
-    const mi = rows.find((r) => r.esGoldery && r.marca !== elegida) ?? rows.find((r) => r.esGoldery);
+    // Consolidar TODAS las filas esGoldery (por si hay varias marcasPropias) en un único "mi"
+    const misRows = rows.filter((r) => r.esGoldery && r.marca !== elegida);
+    const miVol = misRows.reduce((s, r) => s + r.volumenMl, 0);
+    const miValor = misRows.reduce((s, r) => s + r.precioMlPromedio * r.volumenMl, 0);
+    const miPrecioMl = miVol > 0 ? miValor / miVol : 0;
+    const miPresente = misRows.length > 0 && miVol > 0;
     const volSeg = rows.reduce((s, r) => s + r.volumenMl, 0);
-    const indice = mi && comparada.precioMlPromedio > 0
-      ? (mi.precioMlPromedio / comparada.precioMlPromedio) * 100
+    const indice = miPresente && comparada.precioMlPromedio > 0
+      ? (miPrecioMl / comparada.precioMlPromedio) * 100
       : 0;
     out.push({
       segmento: seg.label,
       marcaComparada: elegida,
       precioMlComparado: comparada.precioMlPromedio,
-      precioMlMiMarca: mi?.precioMlPromedio ?? 0,
+      precioMlMiMarca: miPrecioMl,
       indice,
-      miMarcaPresente: !!mi,
+      miMarcaPresente: miPresente,
       volumenSegmento: volSeg,
-      semaforo: !mi ? "gris" : indice < 100 ? "verde" : "rojo",
+      volumenMiMarca: miVol,
+      semaforo: !miPresente ? "gris" : indice < 100 ? "verde" : "rojo",
     });
   }
   return out;
@@ -576,13 +589,14 @@ export interface CategorySummary {
   share: number;                    // 0-1 share volumen mi marca
   ranking: number;
   numMarcas: number;
-  indicePrecioPromedio: number;     // ponderado por volumen del segmento
+  indicePrecioPromedio: number;     // ponderado por volumen de MI marca en cada segmento
   segmentosMasBarato: number;       // #segmentos con índice < 100
   segmentosTotal: number;
   claimsCubiertos: number;          // 0-1
   claimsTotal: number;
   claimsTengo: number;
   tieneData: boolean;
+  indiceDetalle: Array<{ segmento: string; marcaRef: string; indice: number; volumenMi: number }>;
 }
 export function categorySummary(
   data: NormalizedSku[],
@@ -592,9 +606,9 @@ export function categorySummary(
   const brands = brandRanking(data);
   const mi = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
   const comps = priceComparisonBySegment(data, settings);
-  const compsMi = comps.filter((c) => c.miMarcaPresente && c.indice > 0);
-  const wTot = compsMi.reduce((s, c) => s + c.volumenSegmento, 0) || 1;
-  const idxProm = compsMi.reduce((s, c) => s + c.indice * c.volumenSegmento, 0) / wTot;
+  const compsMi = comps.filter((c) => c.miMarcaPresente && c.indice > 0 && c.volumenMiMarca > 0);
+  const wTot = compsMi.reduce((s, c) => s + c.volumenMiMarca, 0) || 1;
+  const idxProm = compsMi.reduce((s, c) => s + c.indice * c.volumenMiMarca, 0) / wTot;
   const barato = comps.filter((c) => c.semaforo === "verde").length;
   const claimsTengo = claims.filter((c) => c.loTieneGoldery === "si").length;
   return {
@@ -608,6 +622,9 @@ export function categorySummary(
     claimsTotal: claims.length,
     claimsTengo,
     tieneData: data.length > 0,
+    indiceDetalle: compsMi.map((c) => ({
+      segmento: c.segmento, marcaRef: c.marcaComparada, indice: c.indice, volumenMi: c.volumenMiMarca,
+    })),
   };
 }
 
