@@ -101,9 +101,10 @@ function Dashboard() {
           <KpiCard
             label="Índice precio vs líder"
             value={fmtNum(idxPrecio, 0)}
-            sub="Base 100 = líder · <95 valor · >105 sobreprecio"
+            sub={`Ref: ${liderRefName || "—"} · Mi ÷ Ref × 100 (>100 = más caro)`}
             tone="info"
           />
+
           <KpiCard
             label="Brecha vs líder"
             value={fmtPct(gapShare)}
