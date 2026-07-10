@@ -66,14 +66,36 @@ export interface NormalizeReport {
   sinPVP: number;
 }
 
+export interface NormalizeOptions {
+  /** Diccionario para extraer variedad desde la descripción cuando la columna no aporta. */
+  variedadDict?: string[];
+  /** Overrides manuales de variedad, keyed por descripción normalizada del SKU. */
+  variedadOverrides?: Record<string, string>;
+}
+
+/** Placeholders que consideramos "vacío" en el campo variedad (mayúscula/minúscula, con % opcional). */
+function esVariedadVacia(v: string): boolean {
+  const n = normText(v);
+  if (!n) return true;
+  return /^sin variedad(\s*\d+(\.\d+)?\s*%?)?$/.test(n) || n === "n/a" || n === "na" || n === "-";
+}
+
+/** Clave normalizada usada para asociar overrides de variedad al SKU (por descripción). */
+export function overrideKey(descripcion: string): string {
+  return normText(descripcion);
+}
+
 export function normalizeRowsReport(
   rows: RawRow[],
   mapping: Partial<Record<CanonicalField, string>>,
   settings: Settings,
   categoria: string,
+  opts: NormalizeOptions = {},
 ): NormalizeReport {
   const out: NormalizedSku[] = [];
   let sinMarca = 0, tamCero = 0, unidNoPos = 0, sinPVP = 0;
+  const dict = opts.variedadDict ?? settings.variedadDict?.[categoria] ?? [];
+  const overrides = opts.variedadOverrides ?? {};
   rows.forEach((r, i) => {
     const get = (k: CanonicalField) => (mapping[k] ? r[mapping[k]!] : undefined);
     const tam = parseSize(get("tamano"));
@@ -87,12 +109,27 @@ export function normalizeRowsReport(
     const volumenMl = unidades * tam.ml;
     const volumenL = volumenMl / 1000;
     const ventasValor = toNumber(get("ventasValor")) || unidades * pvp;
+    const descripcion = String(get("descripcion") ?? "").trim();
+    // ---- Variedad: (1) override manual, (2) columna si trae valor útil, (3) extracción del texto, (4) "Por clasificar"
+    let variedad = "";
+    const ovr = overrides[overrideKey(descripcion)];
+    if (ovr && ovr.trim()) {
+      variedad = ovr.trim();
+    } else {
+      const raw = String(get("variedad") ?? "").trim();
+      if (raw && !esVariedadVacia(raw)) {
+        variedad = raw;
+      } else {
+        const extraida = extractVariedadFromText(descripcion, dict);
+        variedad = extraida || "Por clasificar";
+      }
+    }
     out.push({
       id: `row-${i}`,
       categoria: String(get("categoria") ?? categoria ?? "").trim() || categoria,
       marca,
-      descripcion: String(get("descripcion") ?? "").trim(),
-      variedad: String(get("variedad") ?? "").trim() || "Sin variedad",
+      descripcion,
+      variedad,
       empaque: String(get("empaque") ?? "").trim(),
       tamanoMl: tam.ml,
       unidad: tam.unidad,
@@ -120,9 +157,11 @@ export function normalizeRows(
   mapping: Partial<Record<CanonicalField, string>>,
   settings: Settings,
   categoria: string,
+  opts: NormalizeOptions = {},
 ): NormalizedSku[] {
-  return normalizeRowsReport(rows, mapping, settings, categoria).data;
+  return normalizeRowsReport(rows, mapping, settings, categoria, opts).data;
 }
+
 
 export interface BrandAgg {
   marca: string;
