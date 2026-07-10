@@ -589,13 +589,14 @@ export interface CategorySummary {
   share: number;                    // 0-1 share volumen mi marca
   ranking: number;
   numMarcas: number;
-  indicePrecioPromedio: number;     // ponderado por volumen del segmento
+  indicePrecioPromedio: number;     // ponderado por volumen de MI marca en cada segmento
   segmentosMasBarato: number;       // #segmentos con índice < 100
   segmentosTotal: number;
   claimsCubiertos: number;          // 0-1
   claimsTotal: number;
   claimsTengo: number;
   tieneData: boolean;
+  indiceDetalle: Array<{ segmento: string; marcaRef: string; indice: number; volumenMi: number }>;
 }
 export function categorySummary(
   data: NormalizedSku[],
@@ -605,9 +606,9 @@ export function categorySummary(
   const brands = brandRanking(data);
   const mi = brands.find((b) => b.marca === settings.marcaPropia) ?? brands.find((b) => b.esGoldery);
   const comps = priceComparisonBySegment(data, settings);
-  const compsMi = comps.filter((c) => c.miMarcaPresente && c.indice > 0);
-  const wTot = compsMi.reduce((s, c) => s + c.volumenSegmento, 0) || 1;
-  const idxProm = compsMi.reduce((s, c) => s + c.indice * c.volumenSegmento, 0) / wTot;
+  const compsMi = comps.filter((c) => c.miMarcaPresente && c.indice > 0 && c.volumenMiMarca > 0);
+  const wTot = compsMi.reduce((s, c) => s + c.volumenMiMarca, 0) || 1;
+  const idxProm = compsMi.reduce((s, c) => s + c.indice * c.volumenMiMarca, 0) / wTot;
   const barato = comps.filter((c) => c.semaforo === "verde").length;
   const claimsTengo = claims.filter((c) => c.loTieneGoldery === "si").length;
   return {
@@ -621,6 +622,9 @@ export function categorySummary(
     claimsTotal: claims.length,
     claimsTengo,
     tieneData: data.length > 0,
+    indiceDetalle: compsMi.map((c) => ({
+      segmento: c.segmento, marcaRef: c.marcaComparada, indice: c.indice, volumenMi: c.volumenMiMarca,
+    })),
   };
 }
 
