@@ -1,8 +1,17 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CanonicalField, ClaimRow, NormalizedSku, RawRow, Settings } from "./types";
-import { DEFAULT_SETTINGS, normalizeRows, buildPriceSnapshot, type PriceSnapshot } from "./calc";
+import { DEFAULT_SETTINGS, normalizeRows, buildPriceSnapshot, overrideKey, mergeSegmentBands, type PriceSnapshot } from "./calc";
 import { buildMockRows, MOCK_COLUMN_MAP } from "./mock";
+
+/** Opciones de normalización derivadas del estado activo (dict + overrides de variedad). */
+function normOptsFor(settings: Settings, categoria: string, overrides?: Record<string, string>) {
+  return {
+    variedadDict: settings.variedadDict?.[categoria] ?? [],
+    variedadOverrides: overrides ?? {},
+  };
+}
+
 
 export interface PackChecklist {
   sku: string;
