@@ -149,6 +149,39 @@ function SharePage() {
               Flecha verde = sobreindexado (gano más volumen del que me toca). Flecha roja = sub-indexado (pierdo volumen que me correspondería).
             </div>
           </div>
+
+          <details className="group rounded-md border border-border bg-muted/30">
+            <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-semibold text-foreground flex items-center justify-between">
+              <span>¿Cómo leer esta tabla?</span>
+              <span className="text-muted-foreground text-[10px] group-open:hidden">Expandir</span>
+              <span className="text-muted-foreground text-[10px] hidden group-open:inline">Cerrar</span>
+            </summary>
+            <div className="px-3 pb-3 pt-1 text-xs text-muted-foreground leading-relaxed space-y-2">
+              <p>
+                Imagina que tu marca tiene el <span className="font-semibold text-foreground">{fmtPct(goldery?.shareVolumen ?? 0)}</span> de todo el mercado.
+                Si tu venta se repartiera de forma pareja, deberías tener ese mismo {fmtPct(goldery?.shareVolumen ?? 0)} en cada tamaño y en cada variedad.
+                Esta tabla compara tu participación real en cada segmento contra ese punto de referencia:
+              </p>
+              <ul className="space-y-1 pl-1">
+                <li><span className="text-[color:var(--color-success)] font-semibold">▲ Flecha verde (+):</span> en este segmento vendes <strong>más</strong> de lo que te tocaría — es una fortaleza donde tu producto conecta bien.</li>
+                <li><span className="text-[color:var(--color-danger)] font-semibold">▼ Flecha roja o punto (−):</span> en este segmento vendes <strong>menos</strong> de lo que te tocaría — o no participas, o tu producto no está convirtiendo ahí.</li>
+                <li>La columna <span className="font-semibold text-foreground">PESO</span> te dice qué tan grande es cada segmento dentro de la categoría. Una brecha negativa en un segmento de mucho peso es más grave que en uno pequeño: es donde más volumen estás dejando sobre la mesa.</li>
+              </ul>
+              <div className="pt-1 text-[10px] font-mono text-muted-foreground/80">
+                Fórmula: Brecha = Share en el segmento − Share total de la marca (en puntos porcentuales).
+              </div>
+            </div>
+          </details>
+
+          {(goldery?.shareVolumen ?? 0) > 0 && (goldery?.shareVolumen ?? 0) < 0.03 && (
+            <div className="rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-3 text-xs text-foreground leading-relaxed">
+              <span className="font-semibold">⚠ Cuidado con el espejismo:</span> tu share total es bajo ({fmtPct(goldery?.shareVolumen ?? 0)}),
+              por lo que superar tu promedio es fácil y las flechas verdes pueden dar una falsa sensación de fortaleza.
+              Prioriza la lectura por <span className="font-semibold">PESO</span> del segmento: la pregunta clave no es
+              "¿supero mi promedio?" sino <span className="italic">"¿participo donde está el volumen?"</span>
+            </div>
+          )}
+
           <div className="grid lg:grid-cols-2 gap-5">
             <FairShareTable titulo="Por agrupación de tamaño" rows={fairSeg} marcaPropia={settings.marcaPropia} />
             <FairShareTable titulo="Por variedad / aroma" rows={fairVar} marcaPropia={settings.marcaPropia} />
