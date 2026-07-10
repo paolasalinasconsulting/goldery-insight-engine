@@ -859,3 +859,44 @@ export function unclassifiedStats(
     .map((r) => `${r.marca}${r.desc ? " · " + r.desc : ""} (${r.unidades.toLocaleString()} u)`);
   return { skus: bad.length, unidades, ejemplos, totalUnidades, pctUnidades: unidades / (totalUnidades + unidades) };
 }
+
+/* ============================================================
+ * Sugerencia de bandas cuando >5% del volumen queda "Sin clasificar"
+ * porque los tamaños reales no caen en ninguna banda existente.
+ * ============================================================ */
+export interface UnclassifiedBandsSuggestion {
+  pctVolumen: number;
+  skus: number;
+  suggested: SegmentRange[];
+  tamanosEjemplo: number[];
+}
+
+export function unclassifiedBandsSuggestion(data: NormalizedSku[]): UnclassifiedBandsSuggestion {
+  const total = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const uncl = data.filter((r) => r.segmento === "Sin clasificar" && r.tamanoMl > 0);
+  const volUncl = uncl.reduce((s, r) => s + r.volumenMl, 0);
+  const sizes = uncl.map((r) => r.tamanoMl).sort((a, b) => a - b);
+  // clustering 1D por proximidad (15%)
+  const clusters: number[][] = [];
+  for (const sz of sizes) {
+    const last = clusters[clusters.length - 1];
+    if (last && sz <= last[last.length - 1] * 1.15) last.push(sz);
+    else clusters.push([sz]);
+  }
+  const suggested: SegmentRange[] = clusters.map((c) => {
+    const mid = c[Math.floor(c.length / 2)];
+    const roundTo = mid >= 5000 ? 1000 : mid >= 1000 ? 500 : 100;
+    const center = Math.round(mid / roundTo) * roundTo;
+    return { label: `~${center} ml`, min: Math.min(...c), max: Math.max(...c) };
+  });
+  const tamanosEjemplo = Array.from(new Set(sizes)).slice(0, 8);
+  return { pctVolumen: volUncl / total, skus: uncl.length, suggested, tamanosEjemplo };
+}
+
+/** Fusiona bandas nuevas con las existentes, ordenadas por min y sin duplicar labels. */
+export function mergeSegmentBands(existing: SegmentRange[], nuevas: SegmentRange[]): SegmentRange[] {
+  const map = new Map<string, SegmentRange>();
+  for (const s of existing) map.set(s.label, s);
+  for (const s of nuevas) if (!map.has(s.label)) map.set(s.label, s);
+  return [...map.values()].sort((a, b) => a.min - b.min);
+}
