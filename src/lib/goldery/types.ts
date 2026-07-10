@@ -78,4 +78,6 @@ export interface Settings {
   comparacionesPrecio: Record<string, string>; // segmento -> marca contra la que se compara
   umbralOportunidad: { alta: number; media: number };
   umbralIndicePrecio: { muyBarato: number; valor: number; paridad: number; sobreprecio: number };
+  /** Diccionario de variedades por categoría — el matcher extrae la más específica del texto de la descripción. */
+  variedadDict: Record<string, string[]>;
 }
