@@ -437,6 +437,7 @@ export const useGoldery = create<GolderyState>()(
         rawRows: s.rawRows, rawColumns: s.rawColumns, mapping: s.mapping,
         settings: s.settings, claims: s.claims, packChecks: s.packChecks,
         priceHistory: s.priceHistory,
+        variedadOverrides: s.variedadOverrides,
         mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
       }),
       onRehydrateStorage: () => (state) => {
