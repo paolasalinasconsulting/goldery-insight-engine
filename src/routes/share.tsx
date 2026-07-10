@@ -149,6 +149,39 @@ function SharePage() {
               Flecha verde = sobreindexado (gano más volumen del que me toca). Flecha roja = sub-indexado (pierdo volumen que me correspondería).
             </div>
           </div>
+
+          <details className="group rounded-md border border-border bg-muted/30">
+            <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-semibold text-foreground flex items-center justify-between">
+              <span>¿Cómo leer esta tabla?</span>
+              <span className="text-muted-foreground text-[10px] group-open:hidden">Expandir</span>
+              <span className="text-muted-foreground text-[10px] hidden group-open:inline">Cerrar</span>
+            </summary>
+            <div className="px-3 pb-3 pt-1 text-xs text-muted-foreground leading-relaxed space-y-2">
+              <p>
+                Imagina que tu marca tiene el <span className="font-semibold text-foreground">{fmtPct(goldery?.shareVolumen ?? 0)}</span> de todo el mercado.
+                Si tu venta se repartiera de forma pareja, deberías tener ese mismo {fmtPct(goldery?.shareVolumen ?? 0)} en cada tamaño y en cada variedad.
+                Esta tabla compara tu participación real en cada segmento contra ese punto de referencia:
+              </p>
+              <ul className="space-y-1 pl-1">
+                <li><span className="text-[color:var(--color-success)] font-semibold">▲ Flecha verde (+):</span> en este segmento vendes <strong>más</strong> de lo que te tocaría — es una fortaleza donde tu producto conecta bien.</li>
+                <li><span className="text-[color:var(--color-danger)] font-semibold">▼ Flecha roja o punto (−):</span> en este segmento vendes <strong>menos</strong> de lo que te tocaría — o no participas, o tu producto no está convirtiendo ahí.</li>
+                <li>La columna <span className="font-semibold text-foreground">PESO</span> te dice qué tan grande es cada segmento dentro de la categoría. Una brecha negativa en un segmento de mucho peso es más grave que en uno pequeño: es donde más volumen estás dejando sobre la mesa.</li>
+              </ul>
+              <div className="pt-1 text-[10px] font-mono text-muted-foreground/80">
+                Fórmula: Brecha = Share en el segmento − Share total de la marca (en puntos porcentuales).
+              </div>
+            </div>
+          </details>
+
+          {(goldery?.shareVolumen ?? 0) > 0 && (goldery?.shareVolumen ?? 0) < 0.03 && (
+            <div className="rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-3 text-xs text-foreground leading-relaxed">
+              <span className="font-semibold">⚠ Cuidado con el espejismo:</span> tu share total es bajo ({fmtPct(goldery?.shareVolumen ?? 0)}),
+              por lo que superar tu promedio es fácil y las flechas verdes pueden dar una falsa sensación de fortaleza.
+              Prioriza la lectura por <span className="font-semibold">PESO</span> del segmento: la pregunta clave no es
+              "¿supero mi promedio?" sino <span className="italic">"¿participo donde está el volumen?"</span>
+            </div>
+          )}
+
           <div className="grid lg:grid-cols-2 gap-5">
             <FairShareTable titulo="Por agrupación de tamaño" rows={fairSeg} marcaPropia={settings.marcaPropia} />
             <FairShareTable titulo="Por variedad / aroma" rows={fairVar} marcaPropia={settings.marcaPropia} />
@@ -226,6 +259,26 @@ function SharePage() {
 
 function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: FairShareRow[]; marcaPropia: string }) {
   const sorted = [...rows].sort((a, b) => Math.abs(b.gapPts) - Math.abs(a.gapPts));
+  const maxPeso = rows.reduce((m, r) => Math.max(m, r.pesoSegmento), 0);
+  const tooltipFor = (r: FairShareRow): string => {
+    const shareSeg = fmtPct(r.shareEnSegmento);
+    const shareRef = fmtPct(r.shareReferencia);
+    const peso = fmtPct(r.pesoSegmento);
+    const esMasGrande = r.pesoSegmento === maxPeso && maxPeso > 0;
+    if (r.shareEnSegmento <= 0) {
+      return `No participas en este segmento, que representa el ${peso} del mercado: evalúa si entrar.`;
+    }
+    if (r.indicador === "sobre") {
+      return `Aquí tienes ${shareSeg} vs tu promedio de ${shareRef}: este segmento es una fortaleza.`;
+    }
+    if (r.indicador === "sub") {
+      if (esMasGrande) {
+        return `Aquí tienes ${shareSeg} en el segmento MÁS GRANDE de la categoría (${peso} del mercado): es tu mayor oportunidad de crecimiento.`;
+      }
+      return `Aquí tienes ${shareSeg} vs tu promedio de ${shareRef} en un segmento que pesa ${peso}: estás dejando volumen sobre la mesa.`;
+    }
+    return `Participación pareja con tu promedio (${shareRef}) en un segmento que pesa ${peso}.`;
+  };
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">{titulo}</div>
@@ -244,12 +297,13 @@ function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: F
               : r.indicador === "sub" ? "text-[color:var(--color-danger)]"
               : "text-muted-foreground";
             const arrow = r.indicador === "sobre" ? "▲" : r.indicador === "sub" ? "▼" : "•";
+            const tip = tooltipFor(r);
             return (
               <tr key={r.segmento} className="border-b border-border/50">
                 <td className="py-1.5 truncate max-w-[180px]">{r.segmento}</td>
                 <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmtPct(r.pesoSegmento)}</td>
                 <td className="py-1.5 text-right tabular-nums">{fmtPct(r.shareEnSegmento)}</td>
-                <td className={`py-1.5 text-right tabular-nums font-semibold ${color}`}>
+                <td className={`py-1.5 text-right tabular-nums font-semibold ${color} cursor-help`} title={tip}>
                   {arrow} {r.gapPts > 0 ? "+" : ""}{r.gapPts.toFixed(1)} pts
                 </td>
               </tr>
@@ -258,7 +312,7 @@ function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: F
         </tbody>
       </table>
       <div className="mt-2 text-[10px] text-muted-foreground">
-        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}.
+        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}. Pasa el cursor sobre la brecha para ver la interpretación.
       </div>
     </div>
   );
