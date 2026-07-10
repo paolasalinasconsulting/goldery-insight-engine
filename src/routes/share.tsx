@@ -178,9 +178,17 @@ function SharePage() {
         </div>
 
         <div className="panel overflow-hidden">
-          <div className="px-4 py-3 text-xs text-muted-foreground border-b border-border">
-            Tabla de ranking · <span className="font-semibold text-foreground">share volumen</span> es la métrica principal.
-            Share unidades y share valor se muestran como referencia únicamente.
+          <div className="px-4 py-3 text-xs text-muted-foreground border-b border-border space-y-1.5">
+            <div>
+              Tabla de ranking · <span className="font-semibold text-foreground">share volumen</span> es la métrica principal.
+              Share unidades y share valor se muestran como referencia únicamente.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">Share unidades</span>: % de piezas/frascos vendidos por la marca sobre el total de unidades de la categoría. No distingue tamaño, así que una marca fuerte en presentaciones pequeñas (sachets, 500 ml) puede verse inflada aquí frente a share volumen.
+            </div>
+            <div>
+              <span className="font-semibold text-foreground">Share valor</span>: % de facturación en dólares (PVP × unidades) de la marca sobre el total de la categoría. Refleja poder monetario y se infla con marcas premium o de precio alto, aunque muevan menos producto que el líder en volumen.
+            </div>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-xs text-muted-foreground">
