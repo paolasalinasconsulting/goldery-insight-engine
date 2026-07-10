@@ -29,7 +29,10 @@ function Dashboard() {
       const st = categoriasGuardadas[cat];
       if (!st) return { cat, summary: categorySummary([], settings, []), activa: false };
       const localSettings: typeof settings = { ...settings, liderManual: st.liderManual, comparacionesPrecio: st.comparacionesPrecio };
-      const norm = normalizeRows(st.rawRows, st.mapping, localSettings, cat);
+      const norm = normalizeRows(st.rawRows, st.mapping, localSettings, cat, {
+        variedadDict: localSettings.variedadDict?.[cat] ?? [],
+        variedadOverrides: st.variedadOverrides ?? {},
+      });
       return { cat, summary: categorySummary(norm, localSettings, st.claims), activa: false };
     });
   }, [categorias, categoriasGuardadas, categoria, data, settings, claims]);
