@@ -85,6 +85,35 @@ function ConfigPage() {
           <div className="text-xs text-muted-foreground mb-3">
             Rangos totalmente editables. Ejemplo: 900-1000-1100 ml agrupados como "~1000 ml".
           </div>
+
+          {uncl.pctVolumen > 0.05 && uncl.suggested.length > 0 && (
+            <div className="mb-4 rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-3 text-xs">
+              <div className="font-semibold text-foreground">
+                ⚠ {(uncl.pctVolumen * 100).toFixed(1)}% del volumen quedó "Sin clasificar" ({uncl.skus} SKUs)
+              </div>
+              <div className="text-muted-foreground mt-1">
+                Los tamaños actuales de la categoría no caen en ninguna banda existente. Tamaños detectados:{" "}
+                <span className="font-mono">{uncl.tamanosEjemplo.map((t) => `${t} ml`).join(", ")}</span>.
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">Bandas sugeridas:</span>
+                {uncl.suggested.map((s) => (
+                  <Chip key={s.label} tone="info">{s.label} ({s.min}-{isFinite(s.max) ? s.max : "∞"})</Chip>
+                ))}
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Agregar ${uncl.suggested.length} banda(s) sugerida(s) a la agrupación actual?`)) {
+                      aplicarBandasSugeridas(uncl.suggested);
+                    }
+                  }}
+                  className="ml-auto text-xs px-3 py-1 rounded-md bg-primary text-primary-foreground font-medium"
+                >
+                  Agregar bandas sugeridas
+                </button>
+              </div>
+            </div>
+          )}
+
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr><th className="text-left py-2">Segmento</th><th className="text-right py-2">Mín</th><th className="text-right py-2">Máx</th><th></th></tr>
