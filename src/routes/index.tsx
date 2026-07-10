@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { analyzeSegments, brandRanking, paretoSkus, categorySummary, normalizeRows } from "@/lib/goldery/calc";
+import { analyzeSegments, brandRanking, paretoSkus, categorySummary, normalizeRows, categoryLeader } from "@/lib/goldery/calc";
 import { PageHeader, KpiCard, InsightCard, Chip, SoWhat, fmtNum, fmtPct, fmtMoney } from "@/components/goldery/ui";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import { Link } from "@tanstack/react-router";
