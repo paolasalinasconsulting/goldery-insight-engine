@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, suggestSegments } from "@/lib/goldery/calc";
+import { brandRanking, suggestSegments, unclassifiedBandsSuggestion, DEFAULT_VARIEDAD_DICT } from "@/lib/goldery/calc";
 import { PageHeader, Chip } from "@/components/goldery/ui";
 
 export const Route = createFileRoute("/configuracion")({
@@ -15,8 +15,16 @@ export const Route = createFileRoute("/configuracion")({
 });
 
 function ConfigPage() {
-  const { settings, updateSettings, setLiderManual, categoria, categorias, data, eliminarCategoria } = useGoldery();
+  const {
+    settings, updateSettings, setLiderManual, categoria, categorias, data,
+    eliminarCategoria, updateVariedadDict, aplicarBandasSugeridas, reprocesarVariedades,
+  } = useGoldery();
   const brands = useMemo(() => brandRanking(data), [data]);
+  const uncl = useMemo(() => unclassifiedBandsSuggestion(data), [data]);
+  const dictActual = settings.variedadDict?.[categoria] ?? DEFAULT_VARIEDAD_DICT[categoria] ?? [];
+  const [dictTexto, setDictTexto] = useState(dictActual.join(", "));
+  // sync cuando cambia la categoría
+  useMemo(() => setDictTexto(dictActual.join(", ")), [categoria]);
 
   const aplicarSugerencia = () => {
     const nuevos = suggestSegments(data, 6);
@@ -24,6 +32,12 @@ function ConfigPage() {
       updateSettings({ segmentos: nuevos });
     }
   };
+
+  const guardarDict = () => {
+    const terminos = dictTexto.split(",").map((s) => s.trim()).filter(Boolean);
+    updateVariedadDict(categoria, terminos);
+  };
+
 
   return (
     <>
