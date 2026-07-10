@@ -43,11 +43,14 @@ function Dashboard() {
   const totalU = data.reduce((s, r) => s + r.unidades, 0);
   const goldery = brands.find((b) => b.esGoldery);
   const lider = brands[0];
+  const liderRefName = useMemo(() => categoryLeader(data, settings), [data, settings]);
+  const liderRef = brands.find((b) => b.marca === liderRefName);
   const gapShare = lider && goldery ? lider.shareVolumen - goldery.shareVolumen : 0;
   const precioMl = (b?: { ventasValor: number; volumenMl: number }) =>
     b && b.volumenMl > 0 ? b.ventasValor / b.volumenMl : 0;
-  const idxPrecio = lider && goldery && precioMl(lider) > 0
-    ? (precioMl(goldery) / precioMl(lider)) * 100
+  // KPI grande: mismo criterio que la tarjeta — ref = líder de categoría (respeta liderManual)
+  const idxPrecio = liderRef && goldery && precioMl(liderRef) > 0
+    ? (precioMl(goldery) / precioMl(liderRef)) * 100
     : 0;
   const segParticipa = segs.filter((s) => s.participaGoldery).length;
   const segNoParticipa = segs.length - segParticipa;
