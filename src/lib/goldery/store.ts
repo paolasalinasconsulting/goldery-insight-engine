@@ -35,6 +35,8 @@ interface CategoriaState {
   liderManual?: string;
   comparacionesPrecio: Record<string, string>;
   priceHistory: PriceSnapshot[];
+  /** Overrides manuales de variedad por SKU (clave = descripción normalizada). */
+  variedadOverrides?: Record<string, string>;
 }
 
 interface GolderyState {
