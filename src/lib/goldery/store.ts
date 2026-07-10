@@ -65,6 +65,7 @@ interface GolderyState {
   claims: ClaimRow[];
   packChecks: PackChecklist[];
   priceHistory: PriceSnapshot[];
+  variedadOverrides: Record<string, string>;
   mercaditoA: MercaditoScenario;
   mercaditoB: MercaditoScenario;
 
