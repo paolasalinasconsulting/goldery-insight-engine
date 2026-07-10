@@ -5,12 +5,24 @@ export const DEFAULT_SEGMENTS: SegmentRange[] = [
   { label: "Pequeño (0-500 ml)", min: 0, max: 500 },
   { label: "~1000 ml", min: 501, max: 1200 },
   { label: "~1300 ml", min: 1201, max: 1500 },
-  { label: "~1800 ml", min: 1501, max: 2200 },
+  { label: "~1800 ml", min: 1501, max: 1900 },
+  { label: "~2000 ml", min: 1901, max: 2200 },
   { label: "~2500 ml", min: 2201, max: 2800 },
   { label: "~3000 ml", min: 2801, max: 3400 },
   { label: "~4000 ml", min: 3401, max: 4500 },
-  { label: "5000 ml+", min: 4501, max: Infinity },
+  { label: "~5000 ml", min: 4501, max: 6000 },
+  { label: "~10000 ml", min: 6001, max: Infinity },
 ];
+
+/** Diccionario semilla de variedades por categoría. Editable por el usuario en Configuración. */
+export const DEFAULT_VARIEDAD_DICT: Record<string, string[]> = {
+  "Detergente líquido": [
+    "Bicarbonato", "2 en 1", "Floral", "Flores", "Primavera", "Lavanda",
+    "Ropa Bebé", "Bebé", "Sport", "Original", "Con Suavizante",
+    "Cuidado y Renovación", "Frescura Intensa", "Triple Poder",
+    "Malos Olores", "Toque Suavizante", "Cremoso", "Antibacterial",
+  ],
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   marcaPropia: "GOLDERY",
@@ -21,11 +33,32 @@ export const DEFAULT_SETTINGS: Settings = {
   comparacionesPrecio: {},
   umbralOportunidad: { alta: 75, media: 50 },
   umbralIndicePrecio: { muyBarato: 85, valor: 95, paridad: 105, sobreprecio: 115 },
+  variedadDict: DEFAULT_VARIEDAD_DICT,
 };
 
 export function segmentOf(ml: number, segs: SegmentRange[]): string {
   return segs.find((s) => ml >= s.min && ml <= s.max)?.label ?? "Sin clasificar";
 }
+
+/** Normaliza texto: minúsculas + sin acentos, para matching robusto. */
+function normText(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+/** Extrae la variedad más específica (texto más largo) del diccionario que aparezca en el texto. */
+export function extractVariedadFromText(text: string, dict: string[]): string {
+  if (!text || !dict || dict.length === 0) return "";
+  const t = normText(text);
+  if (!t) return "";
+  const sorted = [...dict].sort((a, b) => b.length - a.length);
+  for (const v of sorted) {
+    const n = normText(v);
+    if (!n) continue;
+    if (t.includes(n)) return v;
+  }
+  return "";
+}
+
 
 export interface NormalizeReport {
   data: NormalizedSku[];
