@@ -81,6 +81,11 @@ interface GolderyState {
   importBackup: (json: string) => { ok: boolean; error?: string };
   clearPriceHistory: () => void;
   consolidarDuplicados: (keys: string[]) => number;
+  setVariedadOverride: (descripcion: string, variedad: string) => void;
+  clearVariedadOverride: (descripcion: string) => void;
+  reprocesarVariedades: () => void;
+  updateVariedadDict: (categoria: string, terminos: string[]) => void;
+  aplicarBandasSugeridas: (nuevas: { label: string; min: number; max: number }[]) => void;
 }
 
 const DEFAULT_CLAIMS: ClaimRow[] = [
