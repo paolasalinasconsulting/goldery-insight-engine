@@ -159,6 +159,51 @@ function ConfigPage() {
         </div>
 
         <div className="panel p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold">Diccionario de variedades · {categoria}</div>
+            <button
+              onClick={reprocesarVariedades}
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted"
+              title="Vuelve a extraer la variedad desde la descripción usando el diccionario actual"
+            >
+              Re-procesar variedades
+            </button>
+          </div>
+          <div className="text-xs text-muted-foreground mb-3">
+            Cuando la data no trae columna de variedad (o viene vacía), el sistema la extrae desde el texto de la descripción del SKU
+            buscando estos términos. La coincidencia ignora mayúsculas y acentos; si un SKU contiene más de un término, gana
+            <b> el más específico</b> (el de texto más largo). Los SKUs sin coincidencia quedan como "Por clasificar" y se pueden editar
+            manualmente en la Base normalizada.
+          </div>
+          <textarea
+            value={dictTexto}
+            onChange={(e) => setDictTexto(e.target.value)}
+            onBlur={guardarDict}
+            rows={4}
+            className="input font-mono text-xs"
+            placeholder="Bicarbonato, Floral, Lavanda, 2 en 1, …"
+          />
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{dictActual.length} términos activos</span>
+            <button onClick={guardarDict} className="text-[color:var(--color-brand)] hover:underline">Guardar</button>
+            {DEFAULT_VARIEDAD_DICT[categoria] && (
+              <button
+                onClick={() => {
+                  const semilla = DEFAULT_VARIEDAD_DICT[categoria] ?? [];
+                  setDictTexto(semilla.join(", "));
+                  updateVariedadDict(categoria, semilla);
+                }}
+                className="text-muted-foreground hover:text-foreground ml-auto"
+              >
+                Restaurar diccionario por defecto
+              </button>
+            )}
+          </div>
+        </div>
+
+
+
+        <div className="panel p-5">
           <div className="text-sm font-semibold mb-4">Categorías registradas</div>
           <div className="space-y-2">
             {categorias.map((c) => (
