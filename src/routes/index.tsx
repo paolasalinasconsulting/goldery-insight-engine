@@ -259,7 +259,12 @@ function CategoryCard({
       </div>
       <div className="grid grid-cols-3 gap-2">
         <MiniStat dot={dot(shareTone)} label={`Share ${marcaPropia}`} value={fmtPct(summary.share)} />
-        <MiniStat dot={dot(idxTone)} label="Índice precio" value={summary.indicePrecioPromedio > 0 ? fmtNum(summary.indicePrecioPromedio, 0) : "—"} />
+        <MiniStat
+          dot={dot(idxTone)}
+          label="Índice precio"
+          value={summary.indicePrecioPromedio > 0 ? fmtNum(summary.indicePrecioPromedio, 0) : "—"}
+          tooltip={buildIndiceTooltip(summary)}
+        />
         <MiniStat dot={dot(claimTone)} label="Claims cubiertos" value={fmtPct(summary.claimsCubiertos)} />
       </div>
       <div className="mt-2 text-[10px] text-muted-foreground">
@@ -268,9 +273,16 @@ function CategoryCard({
     </button>
   );
 }
-function MiniStat({ dot, label, value }: { dot: string; label: string; value: string }) {
+function buildIndiceTooltip(summary: ReturnType<typeof categorySummary>): string {
+  if (!summary.indiceDetalle?.length) return "Sin segmentos con presencia de mi marca";
+  const lines = summary.indiceDetalle.map(
+    (d) => `${d.segmento}: ${d.indice.toFixed(0)} vs ${d.marcaRef} (peso ${(d.volumenMi / 1000).toFixed(0)} L)`,
+  );
+  return `Fórmula: precio/ml Mi ÷ precio/ml ref × 100, ponderado por volumen de mi marca en cada segmento.\n\n${lines.join("\n")}`;
+}
+function MiniStat({ dot, label, value, tooltip }: { dot: string; label: string; value: string; tooltip?: string }) {
   return (
-    <div>
+    <div title={tooltip} className={tooltip ? "cursor-help" : undefined}>
       <div className="flex items-center gap-1">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
         <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</span>
