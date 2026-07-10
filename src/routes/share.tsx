@@ -259,6 +259,26 @@ function SharePage() {
 
 function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: FairShareRow[]; marcaPropia: string }) {
   const sorted = [...rows].sort((a, b) => Math.abs(b.gapPts) - Math.abs(a.gapPts));
+  const maxPeso = rows.reduce((m, r) => Math.max(m, r.pesoSegmento), 0);
+  const tooltipFor = (r: FairShareRow): string => {
+    const shareSeg = fmtPct(r.shareEnSegmento);
+    const shareRef = fmtPct(r.shareReferencia);
+    const peso = fmtPct(r.pesoSegmento);
+    const esMasGrande = r.pesoSegmento === maxPeso && maxPeso > 0;
+    if (r.shareEnSegmento <= 0) {
+      return `No participas en este segmento, que representa el ${peso} del mercado: evalúa si entrar.`;
+    }
+    if (r.indicador === "sobre") {
+      return `Aquí tienes ${shareSeg} vs tu promedio de ${shareRef}: este segmento es una fortaleza.`;
+    }
+    if (r.indicador === "sub") {
+      if (esMasGrande) {
+        return `Aquí tienes ${shareSeg} en el segmento MÁS GRANDE de la categoría (${peso} del mercado): es tu mayor oportunidad de crecimiento.`;
+      }
+      return `Aquí tienes ${shareSeg} vs tu promedio de ${shareRef} en un segmento que pesa ${peso}: estás dejando volumen sobre la mesa.`;
+    }
+    return `Participación pareja con tu promedio (${shareRef}) en un segmento que pesa ${peso}.`;
+  };
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">{titulo}</div>
@@ -277,12 +297,13 @@ function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: F
               : r.indicador === "sub" ? "text-[color:var(--color-danger)]"
               : "text-muted-foreground";
             const arrow = r.indicador === "sobre" ? "▲" : r.indicador === "sub" ? "▼" : "•";
+            const tip = tooltipFor(r);
             return (
               <tr key={r.segmento} className="border-b border-border/50">
                 <td className="py-1.5 truncate max-w-[180px]">{r.segmento}</td>
                 <td className="py-1.5 text-right tabular-nums text-muted-foreground">{fmtPct(r.pesoSegmento)}</td>
                 <td className="py-1.5 text-right tabular-nums">{fmtPct(r.shareEnSegmento)}</td>
-                <td className={`py-1.5 text-right tabular-nums font-semibold ${color}`}>
+                <td className={`py-1.5 text-right tabular-nums font-semibold ${color} cursor-help`} title={tip}>
                   {arrow} {r.gapPts > 0 ? "+" : ""}{r.gapPts.toFixed(1)} pts
                 </td>
               </tr>
@@ -291,7 +312,7 @@ function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: F
         </tbody>
       </table>
       <div className="mt-2 text-[10px] text-muted-foreground">
-        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}.
+        Referencia: mi share total = {fmtPct(rows[0]?.shareReferencia ?? 0)}. Pasa el cursor sobre la brecha para ver la interpretación.
       </div>
     </div>
   );
