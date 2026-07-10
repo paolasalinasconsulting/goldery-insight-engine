@@ -1,8 +1,17 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CanonicalField, ClaimRow, NormalizedSku, RawRow, Settings } from "./types";
-import { DEFAULT_SETTINGS, normalizeRows, buildPriceSnapshot, type PriceSnapshot } from "./calc";
+import { DEFAULT_SETTINGS, normalizeRows, buildPriceSnapshot, overrideKey, mergeSegmentBands, type PriceSnapshot } from "./calc";
 import { buildMockRows, MOCK_COLUMN_MAP } from "./mock";
+
+/** Opciones de normalización derivadas del estado activo (dict + overrides de variedad). */
+function normOptsFor(settings: Settings, categoria: string, overrides?: Record<string, string>) {
+  return {
+    variedadDict: settings.variedadDict?.[categoria] ?? [],
+    variedadOverrides: overrides ?? {},
+  };
+}
+
 
 export interface PackChecklist {
   sku: string;
@@ -35,6 +44,8 @@ interface CategoriaState {
   liderManual?: string;
   comparacionesPrecio: Record<string, string>;
   priceHistory: PriceSnapshot[];
+  /** Overrides manuales de variedad por SKU (clave = descripción normalizada). */
+  variedadOverrides?: Record<string, string>;
 }
 
 interface GolderyState {
@@ -54,6 +65,7 @@ interface GolderyState {
   claims: ClaimRow[];
   packChecks: PackChecklist[];
   priceHistory: PriceSnapshot[];
+  variedadOverrides: Record<string, string>;
   mercaditoA: MercaditoScenario;
   mercaditoB: MercaditoScenario;
 
@@ -79,6 +91,11 @@ interface GolderyState {
   importBackup: (json: string) => { ok: boolean; error?: string };
   clearPriceHistory: () => void;
   consolidarDuplicados: (keys: string[]) => number;
+  setVariedadOverride: (descripcion: string, variedad: string) => void;
+  clearVariedadOverride: (descripcion: string) => void;
+  reprocesarVariedades: () => void;
+  updateVariedadDict: (categoria: string, terminos: string[]) => void;
+  aplicarBandasSugeridas: (nuevas: { label: string; min: number; max: number }[]) => void;
 }
 
 const DEFAULT_CLAIMS: ClaimRow[] = [
@@ -162,6 +179,7 @@ export const useGoldery = create<GolderyState>()(
       claims: DEFAULT_CLAIMS,
       packChecks: DEFAULT_PACK,
       priceHistory: [],
+      variedadOverrides: {},
       mercaditoA: { ...blankMerc("Empaque actual"), intencion: 32 },
       mercaditoB: { ...blankMerc("Propuesta nueva"), intencion: 46, preferencia: 41, calidad: 72, claridad: 70 },
 
@@ -177,6 +195,7 @@ export const useGoldery = create<GolderyState>()(
           liderManual: s.settings.liderManual,
           comparacionesPrecio: s.settings.comparacionesPrecio,
           priceHistory: s.priceHistory ?? [],
+          variedadOverrides: s.variedadOverrides ?? {},
         };
         const guardadas = { ...s.categoriasGuardadas, [s.categoria]: snapshot };
         const destino = guardadas[c] ?? estadoBlanco();
@@ -186,13 +205,15 @@ export const useGoldery = create<GolderyState>()(
           liderManual: destino.liderManual,
           comparacionesPrecio: destino.comparacionesPrecio,
         };
+        const destOvr = destino.variedadOverrides ?? {};
         set({
           categoria: c,
           categorias: cats,
           categoriasGuardadas: guardadas,
           ...destino,
+          variedadOverrides: destOvr,
           settings: settingsNext,
-          data: normalizeRows(destino.rawRows, destino.mapping, settingsNext, c),
+          data: normalizeRows(destino.rawRows, destino.mapping, settingsNext, c, normOptsFor(settingsNext, c, destOvr)),
         });
       },
 
@@ -229,23 +250,23 @@ export const useGoldery = create<GolderyState>()(
           rawColumns: cols,
           mapping,
           fileName: s.fileName === "(sin datos)" ? "(entrada manual)" : s.fileName,
-          data: normalizeRows(rows, mapping, s.settings, s.categoria),
+          data: normalizeRows(rows, mapping, s.settings, s.categoria, normOptsFor(s.settings, s.categoria, s.variedadOverrides)),
         });
       },
       eliminarFilaManual: (idx) => {
         const s = get();
         const rows = s.rawRows.filter((_, i) => i !== idx);
-        set({ rawRows: rows, data: normalizeRows(rows, s.mapping, s.settings, s.categoria) });
+        set({ rawRows: rows, data: normalizeRows(rows, s.mapping, s.settings, s.categoria, normOptsFor(s.settings, s.categoria, s.variedadOverrides)) });
       },
       actualizarFilaManual: (idx, patch) => {
         const s = get();
         const rows = s.rawRows.map((r, i) => i === idx ? { ...r, ...patch } : r);
-        set({ rawRows: rows, data: normalizeRows(rows, s.mapping, s.settings, s.categoria) });
+        set({ rawRows: rows, data: normalizeRows(rows, s.mapping, s.settings, s.categoria, normOptsFor(s.settings, s.categoria, s.variedadOverrides)) });
       },
 
       recalc: () => {
         const s = get();
-        const data = normalizeRows(s.rawRows, s.mapping, s.settings, s.categoria);
+        const data = normalizeRows(s.rawRows, s.mapping, s.settings, s.categoria, normOptsFor(s.settings, s.categoria, s.variedadOverrides));
         // snapshot histórico: solo si hay data y no hay uno del mismo día
         let priceHistory = s.priceHistory ?? [];
         if (data.length > 0) {
@@ -293,6 +314,7 @@ export const useGoldery = create<GolderyState>()(
           liderManual: s.settings.liderManual,
           comparacionesPrecio: s.settings.comparacionesPrecio,
           priceHistory: s.priceHistory ?? [],
+          variedadOverrides: s.variedadOverrides ?? {},
         };
         const payload = {
           version: 1,
@@ -321,6 +343,7 @@ export const useGoldery = create<GolderyState>()(
             mercaditoA: p.mercaditoA ?? get().mercaditoA,
             mercaditoB: p.mercaditoB ?? get().mercaditoB,
             ...dest,
+            variedadOverrides: dest.variedadOverrides ?? {},
           });
           get().recalc();
           return { ok: true };
@@ -337,7 +360,6 @@ export const useGoldery = create<GolderyState>()(
         const keyOf = (r: RawRow) =>
           [getV(r, "marca"), getV(r, "variedad"), getV(r, "empaque"), getV(r, "tamano")].join("|");
         const target = new Set(keys);
-        // group rows by key preserving first index
         const groups = new Map<string, number[]>();
         s.rawRows.forEach((r, i) => {
           const k = keyOf(r);
@@ -369,7 +391,41 @@ export const useGoldery = create<GolderyState>()(
         get().recalc();
         return mergedGroups;
       },
+
+      setVariedadOverride: (descripcion, variedad) => {
+        const s = get();
+        const key = overrideKey(descripcion);
+        const next = { ...(s.variedadOverrides ?? {}) };
+        const v = variedad.trim();
+        if (v) next[key] = v; else delete next[key];
+        set({ variedadOverrides: next });
+        get().recalc();
+      },
+      clearVariedadOverride: (descripcion) => {
+        const s = get();
+        const key = overrideKey(descripcion);
+        const next = { ...(s.variedadOverrides ?? {}) };
+        delete next[key];
+        set({ variedadOverrides: next });
+        get().recalc();
+      },
+      reprocesarVariedades: () => {
+        get().recalc();
+      },
+      updateVariedadDict: (categoria, terminos) => {
+        const s = get();
+        const dict = { ...(s.settings.variedadDict ?? {}), [categoria]: terminos };
+        set({ settings: { ...s.settings, variedadDict: dict } });
+        get().recalc();
+      },
+      aplicarBandasSugeridas: (nuevas) => {
+        const s = get();
+        const segmentos = mergeSegmentBands(s.settings.segmentos, nuevas);
+        set({ settings: { ...s.settings, segmentos } });
+        get().recalc();
+      },
     }),
+
     {
       name: "categoryiq-store-v1",
       storage: typeof window !== "undefined" ? createJSONStorage(() => localStorage) : undefined,
@@ -381,6 +437,7 @@ export const useGoldery = create<GolderyState>()(
         rawRows: s.rawRows, rawColumns: s.rawColumns, mapping: s.mapping,
         settings: s.settings, claims: s.claims, packChecks: s.packChecks,
         priceHistory: s.priceHistory,
+        variedadOverrides: s.variedadOverrides,
         mercaditoA: s.mercaditoA, mercaditoB: s.mercaditoB,
       }),
       onRehydrateStorage: () => (state) => {

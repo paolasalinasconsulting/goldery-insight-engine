@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, suggestSegments } from "@/lib/goldery/calc";
+import { brandRanking, suggestSegments, unclassifiedBandsSuggestion, DEFAULT_VARIEDAD_DICT } from "@/lib/goldery/calc";
 import { PageHeader, Chip } from "@/components/goldery/ui";
 
 export const Route = createFileRoute("/configuracion")({
@@ -15,8 +15,16 @@ export const Route = createFileRoute("/configuracion")({
 });
 
 function ConfigPage() {
-  const { settings, updateSettings, setLiderManual, categoria, categorias, data, eliminarCategoria } = useGoldery();
+  const {
+    settings, updateSettings, setLiderManual, categoria, categorias, data,
+    eliminarCategoria, updateVariedadDict, aplicarBandasSugeridas, reprocesarVariedades,
+  } = useGoldery();
   const brands = useMemo(() => brandRanking(data), [data]);
+  const uncl = useMemo(() => unclassifiedBandsSuggestion(data), [data]);
+  const dictActual = settings.variedadDict?.[categoria] ?? DEFAULT_VARIEDAD_DICT[categoria] ?? [];
+  const [dictTexto, setDictTexto] = useState(dictActual.join(", "));
+  // sync cuando cambia la categoría
+  useMemo(() => setDictTexto(dictActual.join(", ")), [categoria]);
 
   const aplicarSugerencia = () => {
     const nuevos = suggestSegments(data, 6);
@@ -24,6 +32,12 @@ function ConfigPage() {
       updateSettings({ segmentos: nuevos });
     }
   };
+
+  const guardarDict = () => {
+    const terminos = dictTexto.split(",").map((s) => s.trim()).filter(Boolean);
+    updateVariedadDict(categoria, terminos);
+  };
+
 
   return (
     <>
@@ -71,6 +85,35 @@ function ConfigPage() {
           <div className="text-xs text-muted-foreground mb-3">
             Rangos totalmente editables. Ejemplo: 900-1000-1100 ml agrupados como "~1000 ml".
           </div>
+
+          {uncl.pctVolumen > 0.05 && uncl.suggested.length > 0 && (
+            <div className="mb-4 rounded-md border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-3 text-xs">
+              <div className="font-semibold text-foreground">
+                ⚠ {(uncl.pctVolumen * 100).toFixed(1)}% del volumen quedó "Sin clasificar" ({uncl.skus} SKUs)
+              </div>
+              <div className="text-muted-foreground mt-1">
+                Los tamaños actuales de la categoría no caen en ninguna banda existente. Tamaños detectados:{" "}
+                <span className="font-mono">{uncl.tamanosEjemplo.map((t) => `${t} ml`).join(", ")}</span>.
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">Bandas sugeridas:</span>
+                {uncl.suggested.map((s) => (
+                  <Chip key={s.label} tone="info">{s.label} ({s.min}-{isFinite(s.max) ? s.max : "∞"})</Chip>
+                ))}
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Agregar ${uncl.suggested.length} banda(s) sugerida(s) a la agrupación actual?`)) {
+                      aplicarBandasSugeridas(uncl.suggested);
+                    }
+                  }}
+                  className="ml-auto text-xs px-3 py-1 rounded-md bg-primary text-primary-foreground font-medium"
+                >
+                  Agregar bandas sugeridas
+                </button>
+              </div>
+            </div>
+          )}
+
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr><th className="text-left py-2">Segmento</th><th className="text-right py-2">Mín</th><th className="text-right py-2">Máx</th><th></th></tr>
@@ -114,6 +157,51 @@ function ConfigPage() {
             + Añadir segmento
           </button>
         </div>
+
+        <div className="panel p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold">Diccionario de variedades · {categoria}</div>
+            <button
+              onClick={reprocesarVariedades}
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted"
+              title="Vuelve a extraer la variedad desde la descripción usando el diccionario actual"
+            >
+              Re-procesar variedades
+            </button>
+          </div>
+          <div className="text-xs text-muted-foreground mb-3">
+            Cuando la data no trae columna de variedad (o viene vacía), el sistema la extrae desde el texto de la descripción del SKU
+            buscando estos términos. La coincidencia ignora mayúsculas y acentos; si un SKU contiene más de un término, gana
+            <b> el más específico</b> (el de texto más largo). Los SKUs sin coincidencia quedan como "Por clasificar" y se pueden editar
+            manualmente en la Base normalizada.
+          </div>
+          <textarea
+            value={dictTexto}
+            onChange={(e) => setDictTexto(e.target.value)}
+            onBlur={guardarDict}
+            rows={4}
+            className="input font-mono text-xs"
+            placeholder="Bicarbonato, Floral, Lavanda, 2 en 1, …"
+          />
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{dictActual.length} términos activos</span>
+            <button onClick={guardarDict} className="text-[color:var(--color-brand)] hover:underline">Guardar</button>
+            {DEFAULT_VARIEDAD_DICT[categoria] && (
+              <button
+                onClick={() => {
+                  const semilla = DEFAULT_VARIEDAD_DICT[categoria] ?? [];
+                  setDictTexto(semilla.join(", "));
+                  updateVariedadDict(categoria, semilla);
+                }}
+                className="text-muted-foreground hover:text-foreground ml-auto"
+              >
+                Restaurar diccionario por defecto
+              </button>
+            )}
+          </div>
+        </div>
+
+
 
         <div className="panel p-5">
           <div className="text-sm font-semibold mb-4">Categorías registradas</div>

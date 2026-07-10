@@ -5,12 +5,24 @@ export const DEFAULT_SEGMENTS: SegmentRange[] = [
   { label: "Pequeño (0-500 ml)", min: 0, max: 500 },
   { label: "~1000 ml", min: 501, max: 1200 },
   { label: "~1300 ml", min: 1201, max: 1500 },
-  { label: "~1800 ml", min: 1501, max: 2200 },
+  { label: "~1800 ml", min: 1501, max: 1900 },
+  { label: "~2000 ml", min: 1901, max: 2200 },
   { label: "~2500 ml", min: 2201, max: 2800 },
   { label: "~3000 ml", min: 2801, max: 3400 },
   { label: "~4000 ml", min: 3401, max: 4500 },
-  { label: "5000 ml+", min: 4501, max: Infinity },
+  { label: "~5000 ml", min: 4501, max: 6000 },
+  { label: "~10000 ml", min: 6001, max: Infinity },
 ];
+
+/** Diccionario semilla de variedades por categoría. Editable por el usuario en Configuración. */
+export const DEFAULT_VARIEDAD_DICT: Record<string, string[]> = {
+  "Detergente líquido": [
+    "Bicarbonato", "2 en 1", "Floral", "Flores", "Primavera", "Lavanda",
+    "Ropa Bebé", "Bebé", "Sport", "Original", "Con Suavizante",
+    "Cuidado y Renovación", "Frescura Intensa", "Triple Poder",
+    "Malos Olores", "Toque Suavizante", "Cremoso", "Antibacterial",
+  ],
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   marcaPropia: "GOLDERY",
@@ -21,11 +33,32 @@ export const DEFAULT_SETTINGS: Settings = {
   comparacionesPrecio: {},
   umbralOportunidad: { alta: 75, media: 50 },
   umbralIndicePrecio: { muyBarato: 85, valor: 95, paridad: 105, sobreprecio: 115 },
+  variedadDict: DEFAULT_VARIEDAD_DICT,
 };
 
 export function segmentOf(ml: number, segs: SegmentRange[]): string {
   return segs.find((s) => ml >= s.min && ml <= s.max)?.label ?? "Sin clasificar";
 }
+
+/** Normaliza texto: minúsculas + sin acentos, para matching robusto. */
+function normText(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+/** Extrae la variedad más específica (texto más largo) del diccionario que aparezca en el texto. */
+export function extractVariedadFromText(text: string, dict: string[]): string {
+  if (!text || !dict || dict.length === 0) return "";
+  const t = normText(text);
+  if (!t) return "";
+  const sorted = [...dict].sort((a, b) => b.length - a.length);
+  for (const v of sorted) {
+    const n = normText(v);
+    if (!n) continue;
+    if (t.includes(n)) return v;
+  }
+  return "";
+}
+
 
 export interface NormalizeReport {
   data: NormalizedSku[];
@@ -33,14 +66,36 @@ export interface NormalizeReport {
   sinPVP: number;
 }
 
+export interface NormalizeOptions {
+  /** Diccionario para extraer variedad desde la descripción cuando la columna no aporta. */
+  variedadDict?: string[];
+  /** Overrides manuales de variedad, keyed por descripción normalizada del SKU. */
+  variedadOverrides?: Record<string, string>;
+}
+
+/** Placeholders que consideramos "vacío" en el campo variedad (mayúscula/minúscula, con % opcional). */
+function esVariedadVacia(v: string): boolean {
+  const n = normText(v);
+  if (!n) return true;
+  return /^sin variedad(\s*\d+(\.\d+)?\s*%?)?$/.test(n) || n === "n/a" || n === "na" || n === "-";
+}
+
+/** Clave normalizada usada para asociar overrides de variedad al SKU (por descripción). */
+export function overrideKey(descripcion: string): string {
+  return normText(descripcion);
+}
+
 export function normalizeRowsReport(
   rows: RawRow[],
   mapping: Partial<Record<CanonicalField, string>>,
   settings: Settings,
   categoria: string,
+  opts: NormalizeOptions = {},
 ): NormalizeReport {
   const out: NormalizedSku[] = [];
   let sinMarca = 0, tamCero = 0, unidNoPos = 0, sinPVP = 0;
+  const dict = opts.variedadDict ?? settings.variedadDict?.[categoria] ?? [];
+  const overrides = opts.variedadOverrides ?? {};
   rows.forEach((r, i) => {
     const get = (k: CanonicalField) => (mapping[k] ? r[mapping[k]!] : undefined);
     const tam = parseSize(get("tamano"));
@@ -54,12 +109,27 @@ export function normalizeRowsReport(
     const volumenMl = unidades * tam.ml;
     const volumenL = volumenMl / 1000;
     const ventasValor = toNumber(get("ventasValor")) || unidades * pvp;
+    const descripcion = String(get("descripcion") ?? "").trim();
+    // ---- Variedad: (1) override manual, (2) columna si trae valor útil, (3) extracción del texto, (4) "Por clasificar"
+    let variedad = "";
+    const ovr = overrides[overrideKey(descripcion)];
+    if (ovr && ovr.trim()) {
+      variedad = ovr.trim();
+    } else {
+      const raw = String(get("variedad") ?? "").trim();
+      if (raw && !esVariedadVacia(raw)) {
+        variedad = raw;
+      } else {
+        const extraida = extractVariedadFromText(descripcion, dict);
+        variedad = extraida || "Por clasificar";
+      }
+    }
     out.push({
       id: `row-${i}`,
       categoria: String(get("categoria") ?? categoria ?? "").trim() || categoria,
       marca,
-      descripcion: String(get("descripcion") ?? "").trim(),
-      variedad: String(get("variedad") ?? "").trim() || "Sin variedad",
+      descripcion,
+      variedad,
       empaque: String(get("empaque") ?? "").trim(),
       tamanoMl: tam.ml,
       unidad: tam.unidad,
@@ -87,9 +157,11 @@ export function normalizeRows(
   mapping: Partial<Record<CanonicalField, string>>,
   settings: Settings,
   categoria: string,
+  opts: NormalizeOptions = {},
 ): NormalizedSku[] {
-  return normalizeRowsReport(rows, mapping, settings, categoria).data;
+  return normalizeRowsReport(rows, mapping, settings, categoria, opts).data;
 }
+
 
 export interface BrandAgg {
   marca: string;
@@ -786,4 +858,45 @@ export function unclassifiedStats(
     .slice(0, 4)
     .map((r) => `${r.marca}${r.desc ? " · " + r.desc : ""} (${r.unidades.toLocaleString()} u)`);
   return { skus: bad.length, unidades, ejemplos, totalUnidades, pctUnidades: unidades / (totalUnidades + unidades) };
+}
+
+/* ============================================================
+ * Sugerencia de bandas cuando >5% del volumen queda "Sin clasificar"
+ * porque los tamaños reales no caen en ninguna banda existente.
+ * ============================================================ */
+export interface UnclassifiedBandsSuggestion {
+  pctVolumen: number;
+  skus: number;
+  suggested: SegmentRange[];
+  tamanosEjemplo: number[];
+}
+
+export function unclassifiedBandsSuggestion(data: NormalizedSku[]): UnclassifiedBandsSuggestion {
+  const total = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const uncl = data.filter((r) => r.segmento === "Sin clasificar" && r.tamanoMl > 0);
+  const volUncl = uncl.reduce((s, r) => s + r.volumenMl, 0);
+  const sizes = uncl.map((r) => r.tamanoMl).sort((a, b) => a - b);
+  // clustering 1D por proximidad (15%)
+  const clusters: number[][] = [];
+  for (const sz of sizes) {
+    const last = clusters[clusters.length - 1];
+    if (last && sz <= last[last.length - 1] * 1.15) last.push(sz);
+    else clusters.push([sz]);
+  }
+  const suggested: SegmentRange[] = clusters.map((c) => {
+    const mid = c[Math.floor(c.length / 2)];
+    const roundTo = mid >= 5000 ? 1000 : mid >= 1000 ? 500 : 100;
+    const center = Math.round(mid / roundTo) * roundTo;
+    return { label: `~${center} ml`, min: Math.min(...c), max: Math.max(...c) };
+  });
+  const tamanosEjemplo = Array.from(new Set(sizes)).slice(0, 8);
+  return { pctVolumen: volUncl / total, skus: uncl.length, suggested, tamanosEjemplo };
+}
+
+/** Fusiona bandas nuevas con las existentes, ordenadas por min y sin duplicar labels. */
+export function mergeSegmentBands(existing: SegmentRange[], nuevas: SegmentRange[]): SegmentRange[] {
+  const map = new Map<string, SegmentRange>();
+  for (const s of existing) map.set(s.label, s);
+  for (const s of nuevas) if (!map.has(s.label)) map.set(s.label, s);
+  return [...map.values()].sort((a, b) => a.min - b.min);
 }
