@@ -120,44 +120,40 @@ function RootComponent() {
 }
 
 function AuthGate() {
-  const { user, loading } = useAuth();
+  // Login temporalmente deshabilitado — acceso libre para pruebas.
+  // Para reactivar: restaurar la lógica original de redirección a /auth y sync con nube.
+  const AUTH_DISABLED = true;
+
+  const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const isAuthRoute = location.pathname === "/auth";
 
-  // Redirect unauthenticated users to /auth
+  // Sync opcional si hay usuario (no forzado)
   useEffect(() => {
-    if (!loading && !user && !isAuthRoute) {
-      navigate({ to: "/auth" });
-    }
-  }, [loading, user, isAuthRoute, navigate]);
-
-  // Sync: pull on sign-in, push on sign-out
-  useEffect(() => {
+    if (AUTH_DISABLED) return;
     if (!user) { stopAutoSync(); return; }
     let cancelled = false;
     (async () => {
       const res = await pullFromCloud(user.id);
       if (cancelled) return;
-      // Si la nube está vacía, subimos el snapshot local actual como primer estado
       if (res === "empty") await pushToCloud(user.id);
       startAutoSync(user.id);
     })();
     return () => { cancelled = true; stopAutoSync(); };
   }, [user?.id]);
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Cargando…</div>;
+  if (isAuthRoute) {
+    if (typeof window !== "undefined") window.location.replace("/");
+    return null;
   }
-  if (isAuthRoute || !user) {
-    return <Outlet />;
-  }
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 min-w-0 bg-background">
         <Outlet />
       </main>
+
     </div>
   );
 }
