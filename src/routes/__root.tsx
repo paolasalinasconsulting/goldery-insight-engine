@@ -88,6 +88,30 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    const isChunkLoadError = (value: unknown) => {
+      const message = value instanceof Error ? value.message : String(value ?? "");
+      return message.includes("Failed to fetch dynamically imported module") || message.includes("Importing a module script failed");
+    };
+    const reloadOnce = () => {
+      const key = "category-iq-chunk-reload-attempted";
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+      window.location.reload();
+    };
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (isChunkLoadError(event.reason)) reloadOnce();
+    };
+    const onError = (event: ErrorEvent) => {
+      if (isChunkLoadError(event.error) || isChunkLoadError(event.message)) reloadOnce();
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    window.addEventListener("error", onError);
+    return () => {
+      window.removeEventListener("unhandledrejection", onRejection);
+      window.removeEventListener("error", onError);
+    };
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate />
