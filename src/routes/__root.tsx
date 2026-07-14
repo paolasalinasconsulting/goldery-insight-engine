@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { pullFromCloud, pushToCloud, startAutoSync, stopAutoSync } from "@/lib/goldery/sync";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "@/components/goldery/Sidebar";
+import { AiAssistant } from "@/components/goldery/AiAssistant";
 
 function NotFoundComponent() {
   return (
@@ -158,7 +159,7 @@ function AuthGate() {
       <main className="flex-1 min-w-0 bg-background">
         <Outlet />
       </main>
-
+      <AiAssistant />
     </div>
   );
 }
