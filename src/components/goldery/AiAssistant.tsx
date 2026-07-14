@@ -3,6 +3,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useLocation } from "@tanstack/react-router";
 import { MessageSquare, X, Send, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Overview / Dashboard",
