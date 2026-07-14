@@ -120,13 +120,19 @@ export function AiAssistant() {
               return (
                 <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                       isUser
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
+                        ? "bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap"
                         : "bg-muted text-foreground rounded-bl-sm"
                     }`}
                   >
-                    {text}
+                    {isUser ? (
+                      text
+                    ) : (
+                      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-sm prose-headings:font-semibold prose-strong:font-semibold prose-code:text-xs prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
