@@ -143,8 +143,10 @@ function AuthGate() {
   }, [user?.id]);
 
   if (isAuthRoute) {
-    return <Outlet />;
+    if (typeof window !== "undefined") window.location.replace("/");
+    return null;
   }
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
