@@ -129,8 +129,33 @@ export function AiAssistant() {
                     {isUser ? (
                       text
                     ) : (
-                      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-sm prose-headings:font-semibold prose-strong:font-semibold prose-code:text-xs prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                      <div className="space-y-2 [&_p]:leading-relaxed">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="text-sm">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 text-sm">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 text-sm">{children}</ol>,
+                            li: ({ children }) => <li className="leading-snug">{children}</li>,
+                            strong: ({ children }) => <span className="font-semibold text-foreground">{children}</span>,
+                            em: ({ children }) => <span className="italic">{children}</span>,
+                            h1: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h2: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h3: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h4: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            code: ({ children }) => (
+                              <code className="text-xs bg-background/60 px-1 py-0.5 rounded">{children}</code>
+                            ),
+                            a: ({ children, href }) => (
+                              <a href={href} target="_blank" rel="noreferrer" className="underline text-primary">
+                                {children}
+                              </a>
+                            ),
+                            hr: () => <hr className="my-2 border-border" />,
+                          }}
+                        >
+                          {text}
+                        </ReactMarkdown>
                       </div>
                     )}
                   </div>
