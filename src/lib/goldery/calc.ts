@@ -824,6 +824,127 @@ export function paretoBrandDiagnosis(
   return { golderyEn80, segmentosPareto80, segmentosGoldery, segmentosCompartidos, caso, mensaje };
 }
 
+/* ============================================================
+ * Pareto por SEGMENTO — vista principal de arena por tamaño.
+ * Agrupa por segmento y dentro devuelve el ranking de marcas
+ * con share segmento, share categoría, precios e índice vs líder del segmento.
+ * ============================================================ */
+export interface ParetoSegmentBrandRow {
+  marca: string;
+  empaqueRepresentativo: string;
+  tamanoRepresentativoMl: number;
+  unidades: number;
+  toneladas: number;
+  volumenMl: number;
+  shareSegmento: number;      // 0-1
+  shareCategoria: number;     // 0-1
+  pvpPromedio: number;
+  precioPorMl: number;
+  indicePrecio: number;       // (precioMlMarca / precioMlLider) * 100; líder = 100
+  posicion: number;
+  acumulado: number;          // acumulado de share dentro del segmento
+  enPareto80: boolean;
+  esGoldery: boolean;
+  esLiderSegmento: boolean;
+}
+
+export interface ParetoSegmentBlock {
+  segmento: string;
+  volumenMl: number;
+  toneladas: number;
+  pesoCategoria: number;      // 0-1
+  liderMarca: string;
+  liderToneladas: number;
+  brands: ParetoSegmentBrandRow[];
+  miMarcaPresente: boolean;
+  miMarcaRow?: ParetoSegmentBrandRow;
+}
+
+export function paretoBySegment(
+  data: NormalizedSku[],
+  settings: Settings,
+): ParetoSegmentBlock[] {
+  const totalCat = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const out: ParetoSegmentBlock[] = [];
+  const segLabels = Array.from(new Set(data.map((r) => r.segmento)));
+  for (const segLabel of segLabels) {
+    const rows = data.filter((r) => r.segmento === segLabel);
+    if (rows.length === 0) continue;
+    const volSeg = rows.reduce((s, r) => s + r.volumenMl, 0);
+    if (volSeg <= 0) continue;
+
+    type Agg = {
+      marca: string; esGoldery: boolean;
+      volumenMl: number; unidades: number; sumPvpUnid: number;
+      topSku?: NormalizedSku; topVol: number;
+    };
+    const map = new Map<string, Agg>();
+    for (const r of rows) {
+      const cur = map.get(r.marca) ?? {
+        marca: r.marca, esGoldery: r.esGoldery,
+        volumenMl: 0, unidades: 0, sumPvpUnid: 0, topVol: 0,
+      };
+      cur.volumenMl += r.volumenMl;
+      cur.unidades += r.unidades;
+      cur.sumPvpUnid += r.pvp * r.unidades;
+      if (r.volumenMl > cur.topVol) { cur.topVol = r.volumenMl; cur.topSku = r; }
+      map.set(r.marca, cur);
+    }
+
+    const aggs = [...map.values()].sort((a, b) => b.volumenMl - a.volumenMl);
+    const liderCat = categoryLeader(data, settings);
+    // Líder del segmento = líder de categoría si compite; si no, la marca con mayor volumen no-propia; si no, top.
+    let liderSegMarca = aggs[0].marca;
+    if (aggs.some((a) => a.marca === liderCat)) liderSegMarca = liderCat;
+    else {
+      const noPropia = aggs.find((a) => !a.esGoldery);
+      if (noPropia) liderSegMarca = noPropia.marca;
+    }
+    const liderAgg = aggs.find((a) => a.marca === liderSegMarca)!;
+    const liderPrecioMl = liderAgg.volumenMl > 0 ? liderAgg.sumPvpUnid / liderAgg.volumenMl : 0;
+
+    let acc = 0;
+    const brands: ParetoSegmentBrandRow[] = aggs.map((a, i) => {
+      const shareSeg = a.volumenMl / volSeg;
+      acc += shareSeg;
+      const precioMl = a.volumenMl > 0 ? a.sumPvpUnid / a.volumenMl : 0;
+      const pvpProm = a.unidades > 0 ? a.sumPvpUnid / a.unidades : 0;
+      return {
+        marca: a.marca,
+        empaqueRepresentativo: a.topSku?.empaque || "—",
+        tamanoRepresentativoMl: a.topSku?.tamanoMl ?? 0,
+        unidades: a.unidades,
+        toneladas: (a.volumenMl / 1_000_000) * settings.densidad,
+        volumenMl: a.volumenMl,
+        shareSegmento: shareSeg,
+        shareCategoria: a.volumenMl / totalCat,
+        pvpPromedio: pvpProm,
+        precioPorMl: precioMl,
+        indicePrecio: liderPrecioMl > 0 && precioMl > 0 ? (precioMl / liderPrecioMl) * 100 : 0,
+        posicion: i + 1,
+        acumulado: acc,
+        enPareto80: acc <= 0.8 || (i === 0 && shareSeg > 0.8),
+        esGoldery: a.esGoldery,
+        esLiderSegmento: a.marca === liderSegMarca,
+      };
+    });
+
+    const miMarcaRow = brands.find((b) => b.esGoldery);
+    out.push({
+      segmento: segLabel,
+      volumenMl: volSeg,
+      toneladas: (volSeg / 1_000_000) * settings.densidad,
+      pesoCategoria: volSeg / totalCat,
+      liderMarca: liderSegMarca,
+      liderToneladas: (liderAgg.volumenMl / 1_000_000) * settings.densidad,
+      brands,
+      miMarcaPresente: !!miMarcaRow,
+      miMarcaRow,
+    });
+  }
+  return out.sort((a, b) => b.volumenMl - a.volumenMl);
+}
+
 /** Rows con tamaño vacío/no legible — se descartan del análisis pero pueden ser volumen relevante. */
 export function unclassifiedStats(
   rawRows: RawRow[],
