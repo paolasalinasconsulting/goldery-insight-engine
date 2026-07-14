@@ -3,6 +3,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useLocation } from "@tanstack/react-router";
 import { MessageSquare, X, Send, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Overview / Dashboard",
@@ -118,13 +120,44 @@ export function AiAssistant() {
               return (
                 <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                       isUser
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
+                        ? "bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap"
                         : "bg-muted text-foreground rounded-bl-sm"
                     }`}
                   >
-                    {text}
+                    {isUser ? (
+                      text
+                    ) : (
+                      <div className="space-y-2 [&_p]:leading-relaxed">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p className="text-sm">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 text-sm">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 text-sm">{children}</ol>,
+                            li: ({ children }) => <li className="leading-snug">{children}</li>,
+                            strong: ({ children }) => <span className="font-semibold text-foreground">{children}</span>,
+                            em: ({ children }) => <span className="italic">{children}</span>,
+                            h1: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h2: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h3: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            h4: ({ children }) => <div className="text-sm font-semibold mt-2">{children}</div>,
+                            code: ({ children }) => (
+                              <code className="text-xs bg-background/60 px-1 py-0.5 rounded">{children}</code>
+                            ),
+                            a: ({ children, href }) => (
+                              <a href={href} target="_blank" rel="noreferrer" className="underline text-primary">
+                                {children}
+                              </a>
+                            ),
+                            hr: () => <hr className="my-2 border-border" />,
+                          }}
+                        >
+                          {text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
