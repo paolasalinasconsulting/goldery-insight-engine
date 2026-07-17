@@ -5,6 +5,7 @@ import {
   paretoSkus,
   paretoBrandDiagnosis,
   paretoBySegment,
+  packagingSubtotalsInSegment,
   unclassifiedStats,
   type ParetoSegmentBlock,
   type ParetoSegmentBrandRow,
