@@ -100,6 +100,11 @@ function SegmentView() {
 function SegmentBlock({ block, marcaPropia }: { block: ParetoSegmentBlock; marcaPropia: string }) {
   const [expandAll, setExpandAll] = useState(false);
   const [open, setOpen] = useState(true);
+  const { data, settings } = useGoldery();
+  const empaqueSubs = useMemo(
+    () => packagingSubtotalsInSegment(data, block.segmento, settings),
+    [data, block.segmento, settings],
+  );
 
   const topN = 6;
   const rowsBase = expandAll ? block.brands : block.brands.slice(0, topN);
