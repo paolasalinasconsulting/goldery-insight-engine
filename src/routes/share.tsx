@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useGoldery } from "@/lib/goldery/store";
-import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, unclassifiedStats, type FairShareRow } from "@/lib/goldery/calc";
+import { brandRanking, segmentBrandShare, varietyShare, fairShareBySegment, fairShareByVariedad, fairShareByEmpaque, packagingShare, sizePackagingMatrix, unclassifiedStats, type FairShareRow, type PackagingShareRow, type SizePackagingMatrix } from "@/lib/goldery/calc";
 import { PageHeader, Chip, InsightCard, fmtNum, fmtPct } from "@/components/goldery/ui";
 import { AlertTriangle } from "lucide-react";
 import {
