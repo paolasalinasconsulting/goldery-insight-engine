@@ -191,6 +191,60 @@ function PreciosPage() {
           </table>
         </div>
 
+        {/* Precio/ml entre empaques del mismo tamaño */}
+        {empPricesBySeg.length > 0 && (
+          <div className="panel p-5">
+            <div className="text-sm font-semibold mb-1">Precio/ml entre empaques del mismo tamaño</div>
+            <div className="text-xs text-muted-foreground mb-4">
+              Dentro de cada tamaño, cuánto más caro (o barato) es cada tipo de empaque frente al más económico. Índice 100 = empaque más barato del segmento.
+            </div>
+            <div className="space-y-4">
+              {empPricesBySeg.map(([seg, rows]) => {
+                const sorted = rows.slice().sort((a, b) => a.precioMlPromedio - b.precioMlPromedio);
+                return (
+                  <div key={seg}>
+                    <div className="text-xs font-semibold text-foreground mb-1.5">{seg}</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="text-[10px] uppercase text-muted-foreground border-b border-border">
+                          <tr>
+                            <th className="py-1.5 text-left">Empaque</th>
+                            <th className="py-1.5 text-right">$/ml</th>
+                            <th className="py-1.5 text-right">Índice vs más barato</th>
+                            <th className="py-1.5 text-right">Marcas</th>
+                            <th className="py-1.5 text-right">Unidades</th>
+                            <th className="py-1.5 text-center">{settings.marcaPropia}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sorted.map((r) => {
+                            const idx = r.indiceVsMinEmpaque;
+                            const tone = idx === 0 ? "text-muted-foreground"
+                              : idx <= 105 ? "text-[color:var(--color-success)]"
+                              : idx <= 130 ? "text-[color:var(--color-warning)]"
+                              : "text-[color:var(--color-danger)]";
+                            return (
+                              <tr key={r.empaque} className={`border-b border-border/50 ${r.miParticipa ? "bg-[#facc15]/10" : ""}`}>
+                                <td className="py-1.5 font-medium">{r.empaque}</td>
+                                <td className="py-1.5 text-right tabular-nums">${r.precioMlPromedio.toFixed(4)}</td>
+                                <td className={`py-1.5 text-right tabular-nums font-bold ${tone}`}>{idx > 0 ? idx.toFixed(0) : "—"}</td>
+                                <td className="py-1.5 text-right tabular-nums text-muted-foreground">{r.numMarcas}</td>
+                                <td className="py-1.5 text-right tabular-nums text-muted-foreground">{r.unidades.toLocaleString()}</td>
+                                <td className="py-1.5 text-center">{r.miParticipa ? <span className="text-[#facc15]">◆</span> : <span className="text-muted-foreground/40">—</span>}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+
         <div className="panel p-5">
           <div className="text-sm font-semibold mb-3">Matriz completa precio/ml por marca × segmento</div>
           <div className="overflow-x-auto">
