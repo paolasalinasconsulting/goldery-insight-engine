@@ -150,6 +150,24 @@ function SegmentBlock({ block, marcaPropia }: { block: ParetoSegmentBlock; marca
             </div>
           )}
 
+          {empaqueSubs.length > 1 && (
+            <div className="px-5 py-3 border-b border-border bg-muted/10">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                Composición del segmento por empaque
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {empaqueSubs.map((e) => (
+                  <div key={e.empaque} className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-card border border-border text-[11px]">
+                    <span className="font-semibold">{e.empaque}</span>
+                    <span className="tabular-nums text-muted-foreground">{fmtNum(e.toneladas, 1)} t</span>
+                    <span className="tabular-nums text-[color:var(--color-brand)] font-semibold">{fmtPct(e.shareSegmento)}</span>
+                    <span className="text-muted-foreground/70">· {e.numMarcas} marcas</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[1100px]">
               <thead className="bg-muted/60 text-muted-foreground">
