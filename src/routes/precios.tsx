@@ -19,6 +19,14 @@ function PreciosPage() {
   const { data, settings, setComparacionPrecio, priceHistory, clearPriceHistory } = useGoldery();
   const matrix = useMemo(() => priceMatrix(data), [data]);
   const comps = useMemo(() => priceComparisonBySegment(data, settings), [data, settings]);
+  const empPrices = useMemo(() => pricePackagingComparison(data), [data]);
+  const empPricesBySeg = useMemo(() => {
+    const m = new Map<string, typeof empPrices>();
+    for (const r of empPrices) (m.get(r.segmento) ?? m.set(r.segmento, []).get(r.segmento)!).push(r);
+    return [...m.entries()].filter(([, arr]) => arr.length > 1).sort((a, b) =>
+      b[1].reduce((s, r) => s + r.volumenMl, 0) - a[1].reduce((s, r) => s + r.volumenMl, 0),
+    );
+  }, [empPrices]);
 
   // Feature 2 · Histórico: agrupar por segmento y fecha (día)
   const historico = useMemo(() => {
