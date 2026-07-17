@@ -327,3 +327,129 @@ function FairShareTable({ titulo, rows, marcaPropia }: { titulo: string; rows: F
     </div>
   );
 }
+
+function EmpaqueSection({ empaques, marcaPropia }: { empaques: PackagingShareRow[]; marcaPropia: string }) {
+  if (empaques.length === 0) return null;
+  const top = empaques.slice(0, 10);
+  const totalMi = empaques.reduce((s, e) => s + e.volumenMiMarca, 0);
+  const chart = top.map((e) => ({
+    empaque: e.empaque,
+    share: +(e.shareVolumen * 100).toFixed(1),
+    shareMi: +(e.shareMiMarcaEnEmpaque * 100).toFixed(1),
+  }));
+  return (
+    <div className="panel p-5">
+      <div className="text-sm font-semibold mb-1">Share por tipo de empaque</div>
+      <div className="text-xs text-muted-foreground mb-4">
+        Peso de cada tipo de empaque en el volumen total de la categoría, y participación de {marcaPropia} dentro de cada uno.
+      </div>
+      <div className="grid lg:grid-cols-2 gap-5">
+        <div className="h-[280px]">
+          <ResponsiveContainer>
+            <BarChart data={chart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <XAxis dataKey="empaque" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+              <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" unit="%" />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid var(--color-border)", fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="share" name="Share categoría" fill="var(--color-brand)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="shareMi" name={`${marcaPropia} en el empaque`} fill={MI_COLOR} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="text-[10px] uppercase text-muted-foreground border-b border-border">
+              <tr>
+                <th className="py-1.5 text-left">Empaque</th>
+                <th className="py-1.5 text-right">Toneladas</th>
+                <th className="py-1.5 text-right">% categoría</th>
+                <th className="py-1.5 text-right">Marcas</th>
+                <th className="py-1.5 text-right">Share {marcaPropia}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {empaques.map((e) => (
+                <tr key={e.empaque} className="border-b border-border/50">
+                  <td className="py-1.5 font-medium">{e.empaque}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtNum(e.toneladas, 1)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtPct(e.shareVolumen)}</td>
+                  <td className="py-1.5 text-right tabular-nums text-muted-foreground">{e.numMarcas}</td>
+                  <td className="py-1.5 text-right tabular-nums font-semibold text-[color:var(--color-brand)]">
+                    {e.volumenMiMarca > 0 ? fmtPct(e.shareMiMarcaEnEmpaque) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {totalMi === 0 && (
+            <div className="text-[10px] text-muted-foreground mt-2">
+              {marcaPropia} no aparece en la data mapeada de empaque.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatrizTamanoEmpaque({ matrix, marcaPropia }: { matrix: SizePackagingMatrix; marcaPropia: string }) {
+  if (matrix.segmentos.length === 0 || matrix.empaques.length === 0) return null;
+  const maxPct = Math.max(
+    ...matrix.segmentos.flatMap((s) => matrix.empaques.map((e) => matrix.cells[s]?.[e]?.pctCategoria ?? 0)),
+  );
+  return (
+    <div className="panel p-5">
+      <div className="text-sm font-semibold mb-1">Matriz Tamaño × Empaque</div>
+      <div className="text-xs text-muted-foreground mb-4">
+        Volumen de cada combinación como % de la categoría. Fondo más oscuro = más peso. Un ◆ dorado indica que {marcaPropia} participa en esa celda.
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-[10px] uppercase text-muted-foreground border-b border-border">
+              <th className="py-1.5 text-left sticky left-0 bg-card">Tamaño ↓ / Empaque →</th>
+              {matrix.empaques.map((e) => (
+                <th key={e} className="py-1.5 text-center px-2">
+                  {e}
+                  <div className="text-[9px] text-muted-foreground/70 normal-case font-normal">{fmtPct(matrix.pesoEmpaque[e])}</div>
+                </th>
+              ))}
+              <th className="py-1.5 text-right px-2">Total tamaño</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.segmentos.map((s) => (
+              <tr key={s} className="border-b border-border/50">
+                <td className="py-1.5 font-medium sticky left-0 bg-card">{s}</td>
+                {matrix.empaques.map((e) => {
+                  const cell = matrix.cells[s]?.[e];
+                  const pct = cell?.pctCategoria ?? 0;
+                  const intensity = maxPct > 0 ? pct / maxPct : 0;
+                  const bg = pct > 0 ? `rgba(30, 58, 138, ${Math.min(0.35, intensity * 0.4)})` : "transparent";
+                  return (
+                    <td key={e} className="text-center tabular-nums px-2 py-1.5" style={{ backgroundColor: bg }}>
+                      {pct > 0 ? (
+                        <div className="flex flex-col items-center leading-tight">
+                          <span className="font-semibold">{fmtPct(pct)}</span>
+                          <span className="text-[9px] text-muted-foreground">{fmtNum(cell!.toneladas, 1)} t</span>
+                          {cell!.miParticipa && (
+                            <span className="text-[10px] text-[#facc15]" title={`${marcaPropia}: ${fmtPct(cell!.shareMiMarcaEnCelda)} de la celda`}>◆</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="py-1.5 text-right tabular-nums font-semibold text-muted-foreground px-2">
+                  {fmtPct(matrix.pesoSegmento[s])}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
