@@ -31,6 +31,9 @@ function SharePage() {
   const variedades = useMemo(() => varietyShare(data), [data]);
   const fairSeg = useMemo(() => fairShareBySegment(data), [data]);
   const fairVar = useMemo(() => fairShareByVariedad(data), [data]);
+  const fairEmp = useMemo(() => fairShareByEmpaque(data), [data]);
+  const empaques = useMemo(() => packagingShare(data, settings), [data, settings]);
+  const matrixSE = useMemo(() => sizePackagingMatrix(data, settings), [data, settings]);
 
   const chart = brands.map((b) => ({ marca: b.marca, share: +(b.shareVolumen * 100).toFixed(1), esGoldery: b.esGoldery }));
   const donut = brands.map((b, i) => ({ name: b.marca, value: b.volumenMl, esGoldery: b.esGoldery, color: b.esGoldery ? MI_COLOR : PALETTE[(i + 1) % PALETTE.length] }));
