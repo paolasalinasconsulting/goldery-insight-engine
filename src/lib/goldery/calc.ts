@@ -1021,3 +1021,239 @@ export function mergeSegmentBands(existing: SegmentRange[], nuevas: SegmentRange
   for (const s of nuevas) if (!map.has(s.label)) map.set(s.label, s);
   return [...map.values()].sort((a, b) => a.min - b.min);
 }
+
+/* ============================================================
+ * EMPAQUE — análisis por tipo de presentación (Botella, Doypack, Sachet…)
+ * ============================================================ */
+
+/** Normaliza el string de empaque para agrupar variantes ("DOYPACK", "Doy-Pack", "doy pack"). */
+export function normalizeEmpaque(raw: string): string {
+  const t = (raw || "").toString().trim().toUpperCase();
+  if (!t) return "SIN EMPAQUE";
+  const n = t.replace(/[-_.]/g, " ").replace(/\s+/g, " ");
+  if (/DOY\s*PACK|DOYPACK|POUCH|STAND\s*UP/i.test(n)) return "DOYPACK";
+  if (/BOTELLA|BOTTLE|FRASCO/i.test(n)) return "BOTELLA";
+  if (/SACHET|SOBRE/i.test(n)) return "SACHET";
+  if (/GALON|GAL[OÓ]N/i.test(n)) return "GALÓN";
+  if (/BOLSA|BAG/i.test(n)) return "BOLSA";
+  if (/CAJA|BOX/i.test(n)) return "CAJA";
+  if (/LATA|CAN/i.test(n)) return "LATA";
+  if (/SPRAY/i.test(n)) return "SPRAY";
+  if (/TARRO|POTE/i.test(n)) return "TARRO";
+  return n;
+}
+
+export interface PackagingShareRow {
+  empaque: string;
+  volumenMl: number;
+  toneladas: number;
+  shareVolumen: number;   // 0-1 del total de la categoría
+  numSkus: number;
+  numMarcas: number;
+  shareMiMarcaEnEmpaque: number; // 0-1 (share de mi marca dentro de este empaque)
+  volumenMiMarca: number;
+}
+
+export function packagingShare(data: NormalizedSku[], settings: Settings): PackagingShareRow[] {
+  const totalCat = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const map = new Map<string, { vol: number; volMi: number; skus: Set<string>; marcas: Set<string> }>();
+  for (const r of data) {
+    const k = normalizeEmpaque(r.empaque);
+    const cur = map.get(k) ?? { vol: 0, volMi: 0, skus: new Set<string>(), marcas: new Set<string>() };
+    cur.vol += r.volumenMl;
+    if (r.esGoldery) cur.volMi += r.volumenMl;
+    cur.skus.add(r.id);
+    cur.marcas.add(r.marca);
+    map.set(k, cur);
+  }
+  return [...map.entries()]
+    .map(([empaque, v]) => ({
+      empaque,
+      volumenMl: v.vol,
+      toneladas: (v.vol / 1_000_000) * settings.densidad,
+      shareVolumen: v.vol / totalCat,
+      numSkus: v.skus.size,
+      numMarcas: v.marcas.size,
+      volumenMiMarca: v.volMi,
+      shareMiMarcaEnEmpaque: v.vol > 0 ? v.volMi / v.vol : 0,
+    }))
+    .sort((a, b) => b.volumenMl - a.volumenMl);
+}
+
+/** Share por empaque × marca (para tabla stacked / matriz). */
+export interface PackagingBrandShareStack {
+  empaque: string;
+  volumenTotal: number;
+  marcas: Record<string, number>;         // marca -> share dentro del empaque (0-1)
+  volumenPorMarca: Record<string, number>;
+}
+
+export function packagingBrandShare(data: NormalizedSku[]): PackagingBrandShareStack[] {
+  const map = new Map<string, PackagingBrandShareStack>();
+  for (const r of data) {
+    const k = normalizeEmpaque(r.empaque);
+    const cur = map.get(k) ?? { empaque: k, volumenTotal: 0, marcas: {}, volumenPorMarca: {} };
+    cur.volumenPorMarca[r.marca] = (cur.volumenPorMarca[r.marca] ?? 0) + r.volumenMl;
+    cur.volumenTotal += r.volumenMl;
+    map.set(k, cur);
+  }
+  for (const s of map.values()) {
+    Object.entries(s.volumenPorMarca).forEach(([m, v]) => (s.marcas[m] = v / (s.volumenTotal || 1)));
+  }
+  return [...map.values()].sort((a, b) => b.volumenTotal - a.volumenTotal);
+}
+
+export function fairShareByEmpaque(data: NormalizedSku[]): FairShareRow[] {
+  return fairShareGeneric(data, (r) => normalizeEmpaque(r.empaque));
+}
+
+/** Matriz Tamaño × Empaque: volumen (t) y % del mercado en cada celda + participación de mi marca. */
+export interface SizePackagingCell {
+  segmento: string;
+  empaque: string;
+  volumenMl: number;
+  toneladas: number;
+  pctCategoria: number;
+  volumenMiMarca: number;
+  miParticipa: boolean;
+  shareMiMarcaEnCelda: number;
+}
+export interface SizePackagingMatrix {
+  segmentos: string[];              // orden por peso descendente
+  empaques: string[];               // orden por peso descendente
+  cells: Record<string, Record<string, SizePackagingCell>>; // cells[segmento][empaque]
+  pesoSegmento: Record<string, number>;
+  pesoEmpaque: Record<string, number>;
+  totalCatMl: number;
+}
+
+export function sizePackagingMatrix(data: NormalizedSku[], settings: Settings): SizePackagingMatrix {
+  const totalCat = data.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const cells: Record<string, Record<string, SizePackagingCell>> = {};
+  const volSeg: Record<string, number> = {};
+  const volEmp: Record<string, number> = {};
+  for (const r of data) {
+    const seg = r.segmento;
+    const emp = normalizeEmpaque(r.empaque);
+    cells[seg] ??= {};
+    const cell = cells[seg][emp] ?? {
+      segmento: seg, empaque: emp,
+      volumenMl: 0, toneladas: 0, pctCategoria: 0,
+      volumenMiMarca: 0, miParticipa: false, shareMiMarcaEnCelda: 0,
+    };
+    cell.volumenMl += r.volumenMl;
+    if (r.esGoldery) { cell.volumenMiMarca += r.volumenMl; cell.miParticipa = true; }
+    cells[seg][emp] = cell;
+    volSeg[seg] = (volSeg[seg] ?? 0) + r.volumenMl;
+    volEmp[emp] = (volEmp[emp] ?? 0) + r.volumenMl;
+  }
+  // finalize
+  const pesoSegmento: Record<string, number> = {};
+  const pesoEmpaque: Record<string, number> = {};
+  for (const s of Object.keys(volSeg)) pesoSegmento[s] = volSeg[s] / totalCat;
+  for (const e of Object.keys(volEmp)) pesoEmpaque[e] = volEmp[e] / totalCat;
+  for (const seg of Object.keys(cells)) {
+    for (const emp of Object.keys(cells[seg])) {
+      const c = cells[seg][emp];
+      c.toneladas = (c.volumenMl / 1_000_000) * settings.densidad;
+      c.pctCategoria = c.volumenMl / totalCat;
+      c.shareMiMarcaEnCelda = c.volumenMl > 0 ? c.volumenMiMarca / c.volumenMl : 0;
+    }
+  }
+  const segmentos = Object.keys(volSeg).sort((a, b) => volSeg[b] - volSeg[a]);
+  const empaques = Object.keys(volEmp).sort((a, b) => volEmp[b] - volEmp[a]);
+  return { segmentos, empaques, cells, pesoSegmento, pesoEmpaque, totalCatMl: totalCat };
+}
+
+/** Subtotales por empaque dentro de un segmento (para Pareto por segmento). */
+export interface PackagingSubtotal {
+  empaque: string;
+  toneladas: number;
+  volumenMl: number;
+  shareSegmento: number;
+  numMarcas: number;
+}
+export function packagingSubtotalsInSegment(
+  data: NormalizedSku[],
+  segmento: string,
+  settings: Settings,
+): PackagingSubtotal[] {
+  const rows = data.filter((r) => r.segmento === segmento);
+  const totalSeg = rows.reduce((s, r) => s + r.volumenMl, 0) || 1;
+  const map = new Map<string, { vol: number; marcas: Set<string> }>();
+  for (const r of rows) {
+    const k = normalizeEmpaque(r.empaque);
+    const cur = map.get(k) ?? { vol: 0, marcas: new Set<string>() };
+    cur.vol += r.volumenMl;
+    cur.marcas.add(r.marca);
+    map.set(k, cur);
+  }
+  return [...map.entries()]
+    .map(([empaque, v]) => ({
+      empaque,
+      volumenMl: v.vol,
+      toneladas: (v.vol / 1_000_000) * settings.densidad,
+      shareSegmento: v.vol / totalSeg,
+      numMarcas: v.marcas.size,
+    }))
+    .sort((a, b) => b.volumenMl - a.volumenMl);
+}
+
+/** Comparación de $/ml entre empaques del mismo tamaño (segmento). */
+export interface PricePackagingRow {
+  segmento: string;
+  empaque: string;
+  precioMlPromedio: number;      // ponderado por volumen
+  volumenMl: number;
+  unidades: number;
+  numMarcas: number;
+  indiceVsMinEmpaque: number;    // 100 = el más barato del segmento
+  miParticipa: boolean;
+}
+export function pricePackagingComparison(data: NormalizedSku[]): PricePackagingRow[] {
+  const map = new Map<string, {
+    segmento: string; empaque: string;
+    sumValor: number; volumenMl: number; unidades: number;
+    marcas: Set<string>; mi: boolean;
+  }>();
+  for (const r of data) {
+    if (r.pvp <= 0 || r.tamanoMl <= 0) continue;
+    const emp = normalizeEmpaque(r.empaque);
+    const k = `${r.segmento}||${emp}`;
+    const cur = map.get(k) ?? {
+      segmento: r.segmento, empaque: emp,
+      sumValor: 0, volumenMl: 0, unidades: 0,
+      marcas: new Set<string>(), mi: false,
+    };
+    cur.sumValor += r.pvp * r.unidades;
+    cur.volumenMl += r.volumenMl;
+    cur.unidades += r.unidades;
+    cur.marcas.add(r.marca);
+    if (r.esGoldery) cur.mi = true;
+    map.set(k, cur);
+  }
+  const rows: PricePackagingRow[] = [...map.values()].map((v) => ({
+    segmento: v.segmento,
+    empaque: v.empaque,
+    precioMlPromedio: v.volumenMl > 0 ? v.sumValor / v.volumenMl : 0,
+    volumenMl: v.volumenMl,
+    unidades: v.unidades,
+    numMarcas: v.marcas.size,
+    indiceVsMinEmpaque: 0,
+    miParticipa: v.mi,
+  }));
+  // índice vs empaque más barato dentro del mismo segmento
+  const bySeg = new Map<string, PricePackagingRow[]>();
+  for (const r of rows) {
+    (bySeg.get(r.segmento) ?? bySeg.set(r.segmento, []).get(r.segmento)!).push(r);
+  }
+  for (const list of bySeg.values()) {
+    const positivos = list.filter((r) => r.precioMlPromedio > 0);
+    if (positivos.length === 0) continue;
+    const min = Math.min(...positivos.map((r) => r.precioMlPromedio));
+    for (const r of list) {
+      r.indiceVsMinEmpaque = r.precioMlPromedio > 0 && min > 0 ? (r.precioMlPromedio / min) * 100 : 0;
+    }
+  }
+  return rows.sort((a, b) => a.segmento.localeCompare(b.segmento) || b.volumenMl - a.volumenMl);
+}
