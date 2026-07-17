@@ -185,11 +185,18 @@ function SharePage() {
             </div>
           )}
 
-          <div className="grid lg:grid-cols-2 gap-5">
+          <div className="grid lg:grid-cols-3 gap-5">
             <FairShareTable titulo="Por agrupación de tamaño" rows={fairSeg} marcaPropia={settings.marcaPropia} />
             <FairShareTable titulo="Por variedad / aroma" rows={fairVar} marcaPropia={settings.marcaPropia} />
+            <FairShareTable titulo="Por tipo de empaque" rows={fairEmp} marcaPropia={settings.marcaPropia} />
           </div>
         </div>
+
+        {/* Empaque · Share por tipo de empaque */}
+        <EmpaqueSection empaques={empaques} marcaPropia={settings.marcaPropia} />
+
+        {/* Empaque · Matriz Tamaño × Empaque */}
+        <MatrizTamanoEmpaque matrix={matrixSE} marcaPropia={settings.marcaPropia} />
 
 
 
