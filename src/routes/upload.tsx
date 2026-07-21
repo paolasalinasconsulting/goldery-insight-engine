@@ -261,15 +261,30 @@ function UploadPage() {
                     <div className="font-semibold flex items-center gap-1.5">
                       <Copy className="h-3.5 w-3.5" /> Se detectaron {duplicates.length} posibles SKUs duplicados
                     </div>
-                    <button
-                      onClick={() => {
-                        const n = consolidarDuplicados(duplicates.map((d) => d.key));
-                        setStatus(`✓ ${n} grupo(s) consolidado(s)`);
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[11px] font-medium"
-                    >
-                      <Merge className="h-3 w-3" /> Consolidar todos
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const n = consolidarDuplicados(duplicates.map((d) => d.key));
+                          setStatus(`✓ ${n} grupo(s) consolidado(s)`);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[11px] font-medium"
+                      >
+                        <Merge className="h-3 w-3" /> Consolidar todos
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDupsIgnored((s) => {
+                            const next = new Set(s);
+                            duplicates.forEach((d) => next.add(d.key));
+                            return next;
+                          });
+                          setStatus(`✓ ${duplicates.length} grupo(s) marcados como distintos`);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-[11px] font-medium hover:bg-muted"
+                      >
+                        Todos son distintos
+                      </button>
+                    </div>
                   </div>
                   <div className="text-muted-foreground">
                     Filas con la misma marca + variedad + empaque + tamaño. Decide si son el mismo SKU repetido (consolidar suma las unidades) o SKUs distintos (ignorar y diferenciarlos manualmente en la pestaña de entrada manual).
