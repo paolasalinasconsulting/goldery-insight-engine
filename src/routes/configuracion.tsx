@@ -44,15 +44,27 @@ function ConfigPage() {
       <PageHeader title="Configuración" subtitle={`Reglas del modelo para la categoría: ${categoria}`} />
       <div className="p-8 space-y-6 max-w-4xl">
         <div className="panel p-5">
-          <div className="text-sm font-semibold mb-4">Marca propia y líder</div>
+          <div className="text-sm font-semibold mb-1">Marca a analizar y líder</div>
+          <div className="text-xs text-muted-foreground mb-4">
+            "Mi Marca" es la marca que la plataforma trata como propia en todos los módulos (Share, Precios, Segmentos, Claims).
+            Puede ser cualquier marca — no tiene que ser Goldery. Escríbela <b>exactamente</b> como aparece en la data cargada
+            (ej. <span className="font-mono">LA ORIGINAL</span>). Si quieres analizar varias marcas como un mismo grupo
+            (portafolio propio, marcas privadas del retail, etc.) añádelas en el segundo campo.
+          </div>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Marca propia (Mi Marca)">
-              <input value={settings.marcaPropia} onChange={(e) => updateSettings({ marcaPropia: e.target.value.toUpperCase() })} className="input" />
+            <Field label="Mi Marca (la que se analiza como propia)">
+              <input
+                value={settings.marcaPropia}
+                onChange={(e) => updateSettings({ marcaPropia: e.target.value.toUpperCase() })}
+                placeholder="ej. LA ORIGINAL"
+                className="input"
+              />
             </Field>
-            <Field label="Otras marcas del grupo (coma separada)">
+            <Field label="Marcas adicionales a agrupar como propias (coma separada)">
               <input
                 value={settings.marcasPropias.join(", ")}
                 onChange={(e) => updateSettings({ marcasPropias: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean) })}
+                placeholder="ej. AKI, SUPERMAXI, SMART SELECTION"
                 className="input"
               />
             </Field>
@@ -70,6 +82,13 @@ function ConfigPage() {
               <input type="number" step={0.05} value={settings.densidad} onChange={(e) => updateSettings({ densidad: Number(e.target.value) || 1 })} className="input" />
             </Field>
           </div>
+          {settings.marcaPropia && data.length > 0 && !brands.some((b) => b.marca === settings.marcaPropia) && (
+            <div className="mt-3 text-xs">
+              <Chip tone="warn">
+                "{settings.marcaPropia}" no aparece en la data cargada de {categoria}. Revisa la ortografía exacta contra el ranking de marcas.
+              </Chip>
+            </div>
+          )}
           {settings.liderManual && (
             <div className="mt-3 text-xs"><Chip tone="info">Líder fijado manualmente: {settings.liderManual}</Chip></div>
           )}
